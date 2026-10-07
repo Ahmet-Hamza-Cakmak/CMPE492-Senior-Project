@@ -1,0 +1,24 @@
+<mujoco model="example_line_robot">
+  <option timestep="0.002"/>
+  <worldbody>
+    <body name="robot" pos="0 0 0.065">
+      <freejoint/>
+      <geom type="box" size="0.09 0.055 0.02" mass="0.3" rgba="0.15 0.4 0.7 1"/>
+      <body name="left_wheel" pos="0 0.07 -0.025">
+        <joint name="left_axle" type="hinge" axis="0 1 0"/>
+        <geom type="ellipsoid" size="0.04 0.012 0.04" mass="0.05" rgba="0.1 0.1 0.1 1"/>
+      </body>
+      <body name="right_wheel" pos="0 -0.07 -0.025">
+        <joint name="right_axle" type="hinge" axis="0 1 0"/>
+        <geom type="ellipsoid" size="0.04 0.012 0.04" mass="0.05" rgba="0.1 0.1 0.1 1"/>
+      </body>
+      <geom name="caster" type="sphere" pos="0.07 0 -0.05" size="0.015" mass="0.01" priority="1" friction="0.001 0.0001 0.0001"/>
+      <geom name="rear_caster" type="sphere" pos="-0.07 0 -0.05" size="0.015" mass="0.01" priority="1" friction="0.001 0.0001 0.0001"/>
+      <site name="line_sensor_mount" pos="0.08 0 -0.04" size="0.005" rgba="1 0 0 1"/>
+    </body>
+  </worldbody>
+  <actuator>
+    <motor name="left_motor" joint="left_axle" ctrllimited="true" ctrlrange="-0.1 0.1"/>
+    <motor name="right_motor" joint="right_axle" ctrllimited="true" ctrlrange="-0.1 0.1"/>
+  </actuator>
+</mujoco>
