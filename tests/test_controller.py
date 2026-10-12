@@ -4,17 +4,20 @@ import unittest
 import mujoco
 
 from line_tracker_sim import Corridor, Scenario
-from line_tracker_sim.controller import LineFollower
+from line_tracker_sim.assets import create_controller
 from line_tracker_sim.simulation import build_model, example_robot
 
 
 class ControllerTests(unittest.TestCase):
+    example = "simple_robot"
+
     def setup_simulation(self, sections):
         scenario = Scenario(tuple(Corridor(*section) for section in sections))
-        model = build_model(example_robot(), scenario)
+        path = example_robot(self.example)
+        model = build_model(path, scenario)
         data = mujoco.MjData(model)
         mujoco.mj_forward(model, data)
-        return scenario, model, data, LineFollower(model, scenario)
+        return scenario, model, data, create_controller(path, model, scenario)
 
     def test_tracks_and_stops_using_physics(self):
         routes = [((1.2, 0),), ((.6, 0), (.6, 90)), ((.6, 0), (.6, -90)),
@@ -52,7 +55,7 @@ class ControllerTests(unittest.TestCase):
         mujoco.mj_forward(model, data)
         controller.update(data)
         self.assertTrue(controller.lost)
-        self.assertTrue(all(value == 0 for value in data.ctrl))
+        self.assertTrue(all(data.ctrl[index] == 0 for index in controller.motors))
         controller.finished = True
         controller.last_time = 5
         mujoco.mj_resetData(model, data)
@@ -64,3 +67,7 @@ class ControllerTests(unittest.TestCase):
             controller.update(data)
             mujoco.mj_step(model, data)
         self.assertGreater(data.qpos[0], 0.05)
+
+
+class GoogleControllerTests(ControllerTests):
+    example = "google_robot"

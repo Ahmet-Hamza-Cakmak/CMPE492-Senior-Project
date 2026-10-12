@@ -8,13 +8,13 @@ version = "0.1.0"
 description = "GUI scenario builder for line-tracking robots in MuJoCo"
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = ["mujoco>=3.3.5,<4"]
+dependencies = ["numpy>=1.24", "mujoco>=3.3.5,<4", "PySide6>=6.8,<7", "shapely>=2,<3"]
 
 [project.scripts]
-line-tracker-sim = "line_tracker_sim.gui:main"
+line-tracker-sim = "line_tracker_sim.ui.editor:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
-line_tracker_sim = ["assets/*.xml"]
+line_tracker_sim = ["assets/**/*.xml", "assets/**/*.stl", "assets/**/*.obj", "assets/**/*.png", "assets/**/LICENSE", "assets/**/*.md", "scenarios/presets/*.json"]

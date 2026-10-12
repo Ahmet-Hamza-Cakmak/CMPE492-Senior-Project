@@ -1,5 +1,5 @@
 """Connected track scenarios for MuJoCo."""
 
-from .scenario import Corridor, Scenario
+from .scenarios import Corridor, Scenario, LoopScenario, Terrain
 
-__all__ = ["Corridor", "Scenario"]
+__all__ = ["Corridor", "Scenario", "LoopScenario", "Terrain"]

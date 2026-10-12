@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "name": "Left turn",
+  "description": "Two 2 m corridors connected by a 90° left turn.",
+  "width": 0.8,
+  "line_width": 0.025,
+  "corridors": [{"length": 2.0, "turn": 0.0}, {"length": 2.0, "turn": 90.0}]
+}

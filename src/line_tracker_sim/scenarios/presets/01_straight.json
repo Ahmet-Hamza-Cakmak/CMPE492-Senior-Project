@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "name": "Straight line",
+  "description": "A 3 m straight track for checking forward motion and endpoint braking.",
+  "width": 0.8,
+  "line_width": 0.025,
+  "corridors": [{"length": 3.0, "turn": 0.0}]
+}

@@ -1,3 +1,3 @@
-from .gui import main
+from .ui.editor import main
 
 main()

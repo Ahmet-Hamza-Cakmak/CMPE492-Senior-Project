@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "type": "loop",
+  "name": "Circle circuit",
+  "description": "A closed circular circuit. Automatic driving repeats laps until stopped.",
+  "shape": "circle",
+  "radius": 2.0,
+  "width": 0.8,
+  "line_width": 0.025
+}

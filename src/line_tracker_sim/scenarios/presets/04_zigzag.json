@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "name": "Zigzag",
+  "description": "Alternating 45° turns across four connected corridors.",
+  "width": 0.8,
+  "line_width": 0.025,
+  "corridors": [
+    {"length": 1.5, "turn": 0.0},
+    {"length": 1.5, "turn": 45.0},
+    {"length": 1.5, "turn": -90.0},
+    {"length": 1.5, "turn": 45.0}
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "type": "loop",
+  "name": "Figure-eight circuit",
+  "description": "An infinity-shaped loop with a flat central crossing, not an overpass. Driving follows the route through both lobes.",
+  "shape": "figure_eight",
+  "radius": 3.0,
+  "width": 0.8,
+  "line_width": 0.025
+}
