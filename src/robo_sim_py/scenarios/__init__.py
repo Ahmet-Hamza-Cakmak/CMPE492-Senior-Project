@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 import math
+from typing import Callable
 
 
 @dataclass(frozen=True)
@@ -77,6 +78,39 @@ class Scenario:
 
 
 @dataclass(frozen=True)
+class CircuitDefinition:
+    """Register a closed circuit by supplying unaligned points for a size in metres."""
+    label: str
+    size_label: str
+    generate: Callable[[float], list[tuple[float, float]]]
+
+
+def _circle(radius):
+    return [(radius * math.sin(2*math.pi*i/96), radius * (1-math.cos(2*math.pi*i/96)))
+            for i in range(96)]
+
+
+def _figure_eight(radius):
+    angles = [2*math.pi*i/128 + math.pi/4 for i in range(128)]
+    return [(radius*math.sin(t), radius*math.sin(t)*math.cos(t)) for t in angles]
+
+
+CIRCUITS = {
+    "circle": CircuitDefinition("Circular circuit", "Radius (m)", _circle),
+    "figure_eight": CircuitDefinition("Figure-eight circuit", "Circuit scale (m)", _figure_eight),
+}
+
+
+def register_circuit(key, definition):
+    """Trusted installed extensions call this before loading their scenario presets."""
+    if not isinstance(key, str) or not key.isidentifier() or key in CIRCUITS:
+        raise ValueError("Circuit key must be a new Python identifier.")
+    if not isinstance(definition, CircuitDefinition) or not callable(definition.generate):
+        raise ValueError("Supply a CircuitDefinition with a generator.")
+    CIRCUITS[key] = definition
+
+
+@dataclass(frozen=True)
 class LoopScenario:
     """Smooth closed tracks sampled as short segments, starting along +X."""
 
@@ -87,8 +121,8 @@ class LoopScenario:
     terrain: Terrain = Terrain()
 
     def __post_init__(self):
-        if self.shape not in ("circle", "figure_eight"):
-            raise ValueError("Loop shape must be circle or figure_eight.")
+        if self.shape not in CIRCUITS:
+            raise ValueError(f"Unknown circuit: {self.shape}. Available: {', '.join(CIRCUITS)}")
         if not all(math.isfinite(value) for value in (self.radius, self.width, self.line_width)):
             raise ValueError("Loop dimensions must be finite.")
         if not 0 < self.line_width < self.width:
@@ -101,14 +135,13 @@ class LoopScenario:
         return True
 
     def points(self):
-        count = 128 if self.shape == "figure_eight" else 96
-        raw = []
-        for index in range(count):
-            # Begin away from the figure-eight crossing, near a +X tangent.
-            angle = 2 * math.pi * index / count + (math.pi / 4 if self.shape == "figure_eight" else 0)
-            x = self.radius * math.sin(angle)
-            y = self.radius * (1 - math.cos(angle)) if self.shape == "circle" else self.radius * math.sin(angle) * math.cos(angle)
-            raw.append((x, y))
+        raw = list(CIRCUITS[self.shape].generate(self.radius))
+        if len(raw) < 3 or not all(len(p) == 2 and all(math.isfinite(v) for v in p) for p in raw):
+            raise ValueError("Circuit generators must return at least three finite XY points.")
+        if raw[-1] == raw[0]:
+            raw.pop()
+        if len(raw) < 3 or any(a == b for a, b in zip(raw, raw[1:])):
+            raise ValueError("Circuit points must contain at least three distinct consecutive positions.")
         # Align the first chord with the unchanged bundled robot spawn pose.
         origin = raw[0]
         raw = [(x - origin[0], y - origin[1]) for x, y in raw]

@@ -6,9 +6,9 @@ from unittest.mock import patch
 
 from shapely.geometry import LineString
 
-from line_tracker_sim import LoopScenario
-from line_tracker_sim.scenarios.library import ScenarioPreset, load_preset, parse_preset, save_preset
-from line_tracker_sim.simulation.walls import WALL_THICKNESS, wall_segments
+from robo_sim_py import LoopScenario
+from robo_sim_py.scenarios.library import ScenarioPreset, load_preset, parse_preset, save_preset
+from robo_sim_py.simulation.walls import WALL_THICKNESS, wall_segments
 
 
 class LoopTests(unittest.TestCase):
@@ -40,13 +40,13 @@ class LoopTests(unittest.TestCase):
 
     def test_viewer_receives_loop_config(self):
         import io
-        from line_tracker_sim.simulation.__main__ import main
+        from robo_sim_py.simulation.__main__ import main
         scenario = LoopScenario("figure_eight", 3)
         payload = json.dumps(ScenarioPreset("Eight", "", scenario).to_dict())
         with patch("sys.argv", ["viewer", "--robot", "example.xml", "--auto-follow"]), \
              patch("sys.stdin", io.StringIO(payload)), \
-             patch("line_tracker_sim.simulation.__main__.build_model") as build, \
-             patch("line_tracker_sim.simulation.__main__.run") as run:
+             patch("robo_sim_py.simulation.__main__.build_model") as build, \
+             patch("robo_sim_py.simulation.__main__.run") as run:
             self.assertEqual(main(), 0)
             build.assert_called_once_with("example.xml", scenario)
             run.assert_called_once_with(build.return_value, scenario, auto_follow=True, robot_path="example.xml")

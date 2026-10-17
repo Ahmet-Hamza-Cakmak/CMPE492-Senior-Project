@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from line_tracker_sim.scenarios.library import (
+from robo_sim_py.scenarios.library import (
     BUNDLED_DIRECTORY, discover_presets, load_preset, save_preset, user_scenario_directory,
 )
 
@@ -44,8 +44,8 @@ class PresetTests(unittest.TestCase):
     def test_bundled_tracks_complete_with_both_examples(self):
         import math
         import mujoco
-        from line_tracker_sim.assets import EXAMPLES, create_controller
-        from line_tracker_sim.simulation import build_model
+        from robo_sim_py.assets import EXAMPLES, create_controller
+        from robo_sim_py.simulation import build_model
 
         for _, preset in discover_presets(BUNDLED_DIRECTORY)[0]:
             for example in EXAMPLES:

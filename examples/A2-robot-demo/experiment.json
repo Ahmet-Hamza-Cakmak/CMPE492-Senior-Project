@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "name": "Simple robot on a generated track",
+  "mode": "robot",
+  "robot": "robots/robot.xml",
+  "controller": "python/main.py",
+  "spawn": [0, 0, 0, 0],
+  "config": {},
+  "menagerie": false
+}

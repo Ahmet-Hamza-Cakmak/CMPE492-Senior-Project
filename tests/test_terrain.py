@@ -3,11 +3,11 @@ import unittest
 import mujoco
 import numpy as np
 
-from line_tracker_sim import Corridor, Scenario, LoopScenario, Terrain
-from line_tracker_sim.scenarios.library import ScenarioPreset, parse_preset
-from line_tracker_sim.simulation import build_model, example_robot
-from line_tracker_sim.simulation.terrain import HeightField
-from line_tracker_sim.assets import create_controller
+from robo_sim_py import Corridor, Scenario, LoopScenario, Terrain
+from robo_sim_py.scenarios.library import ScenarioPreset, parse_preset
+from robo_sim_py.simulation import build_model, example_robot
+from robo_sim_py.simulation.terrain import HeightField
+from robo_sim_py.assets import create_controller
 
 
 class TerrainTests(unittest.TestCase):

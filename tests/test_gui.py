@@ -12,8 +12,8 @@ from PySide6.QtWidgets import QApplication, QMessageBox
 from PySide6.QtCore import QProcess, Qt
 from PySide6.QtTest import QTest
 
-from line_tracker_sim.ui.editor import ScenarioWindow
-from line_tracker_sim.scenarios.library import discover_presets
+from robo_sim_py.ui.editor import ScenarioWindow
+from robo_sim_py.scenarios.library import discover_presets
 
 
 class EditorTests(unittest.TestCase):
@@ -31,6 +31,83 @@ class EditorTests(unittest.TestCase):
         self.window.deleteLater()
         self.app.processEvents()
         self.directory.cleanup()
+
+    def test_assignment_zip_without_manifest_launches_as_script(self):
+        from zipfile import ZipFile
+        archive_path = Path(self.directory.name) / "whatever.zip"
+        with ZipFile(archive_path, 'w') as archive:
+            archive.writestr("arbitrary/python/main.py", "raise RuntimeError('Do not execute in editor')")
+            archive.writestr("arbitrary/scenes/circuit.xml", "<mujoco/>")
+        self.window.source_choice.setCurrentIndex(self.window.source_choice.findData("full"))
+        self.window.package_path.setText(str(archive_path))
+        self.window.menagerie_path.setText("")
+        with patch.object(QMessageBox, "question", return_value=QMessageBox.StandardButton.Yes), \
+             patch.object(self.window.process, "start") as start:
+            self.window.launch()
+            start.assert_called_once()
+        self.assertIn("--run-directory", self.window.process.arguments())
+        self.assertEqual(self.window.pending_scenario, b"")
+        self.assertIsNotNone(self.window.last_run_directory)
+
+    def test_package_approval_payload_and_switching(self):
+        from test_experiments import make_zip
+        package = make_zip(Path(self.directory.name) / "robot.zip")
+        self.window.source_choice.setCurrentIndex(self.window.source_choice.findData("robot"))
+        self.window.package_path.setText(str(package))
+        self.assertTrue(self.window.robot_card.isHidden())
+        self.assertFalse(self.window.scenario_card.isHidden())
+        self.window.terrain_mode.setCurrentIndex(1)
+        with patch.object(QMessageBox, "question", return_value=QMessageBox.StandardButton.Cancel), \
+             patch.object(self.window.process, "start") as start:
+            self.window.launch()
+            start.assert_not_called()
+        with patch.object(QMessageBox, "question", return_value=QMessageBox.StandardButton.Yes), \
+             patch.object(self.window.process, "start") as start:
+            self.window.launch()
+            start.assert_called_once()
+        self.assertIn("--package", self.window.process.arguments())
+        self.assertIn("--approved-sha256", self.window.process.arguments())
+        self.assertNotIn("--auto-follow", self.window.process.arguments())
+        self.assertEqual(json.loads(self.window.pending_scenario)["terrain"]["mode"], "waves")
+        self.window.source_choice.setCurrentIndex(self.window.source_choice.findData("full"))
+        with patch.object(QMessageBox, "warning") as warning, \
+             patch.object(QMessageBox, "question") as question, \
+             patch.object(self.window.process, "start") as start:
+            self.window.launch()
+            warning.assert_called_once()
+            question.assert_not_called()
+            start.assert_not_called()
+        make_zip(package, "full")
+        with patch.object(QMessageBox, "question", return_value=QMessageBox.StandardButton.Yes), \
+             patch.object(self.window.process, "start"):
+            self.window.launch()
+        self.assertEqual(self.window.pending_scenario, b"")
+        self.window.source_choice.setCurrentIndex(0)
+        self.assertEqual(self.window.scenario().terrain.mode, "waves")
+        self.assertFalse(self.window.robot_card.isHidden())
+
+    def test_imported_scene_mode_and_return_to_generated(self):
+        original = self.window.scenario()
+        self.window.source_choice.setCurrentIndex(1)
+        self.assertFalse(self.window.launch_button.isEnabled())
+        self.assertTrue(self.window.robot_card.isHidden())
+        scene = Path(self.directory.name) / "scene.xml"
+        scene.write_text('<mujoco><worldbody><geom type="plane" size="2 2 .1"/></worldbody></mujoco>')
+        self.window.scene_path.setText(str(scene))
+        self.assertTrue(self.window.launch_button.isEnabled())
+        with patch.object(self.window.process, "start"):
+            self.window.launch()
+        self.assertIn("--scene", self.window.process.arguments())
+        self.assertNotIn("--auto-follow", self.window.process.arguments())
+        self.assertNotIn("--robot", self.window.process.arguments())
+        self.assertEqual(self.window.pending_scenario, b"")
+        self.window.source_choice.setCurrentIndex(0)
+        self.assertFalse(self.window.robot_card.isHidden())
+        self.assertEqual(self.window.scenario(), original)
+        with patch.object(self.window.process, "start"):
+            self.window.launch()
+        self.assertIn("--robot", self.window.process.arguments())
+        self.assertIn("--auto-follow", self.window.process.arguments())
 
     def test_select_edit_validate_and_preserve_edits_on_cancel(self):
         self.window.preset_choice.setCurrentIndex(1)
@@ -62,7 +139,7 @@ class EditorTests(unittest.TestCase):
         with patch.object(self.window.process, "start"):
             self.window.launch()
         self.assertEqual(json.loads(self.window.pending_scenario)["terrain"]["seed"], 17)
-        with patch("line_tracker_sim.ui.editor.QInputDialog.getText", return_value=("My experiment", True)):
+        with patch("robo_sim_py.ui.editor.QInputDialog.getText", return_value=("My experiment", True)):
             self.window.save_scenario()
         entries, errors = discover_presets(self.directory.name)
         self.assertFalse(errors)
@@ -113,7 +190,7 @@ class EditorTests(unittest.TestCase):
         self.window.preset_choice.setCurrentIndex(1)
         self.assertEqual(self.window.scenario().shape, "figure_eight")
         self.window.radius.setText("4")
-        with patch("line_tracker_sim.ui.editor.QInputDialog.getText", return_value=("Large eight", True)):
+        with patch("robo_sim_py.ui.editor.QInputDialog.getText", return_value=("Large eight", True)):
             self.window.save_scenario()
         with patch.object(self.window.process, "start"):
             self.window.launch()
@@ -156,7 +233,7 @@ class EditorTests(unittest.TestCase):
             results.append(output)
             script = (
                 "import json,sys,time; from pathlib import Path; "
-                "from line_tracker_sim import Scenario,Corridor; "
+                "from robo_sim_py import Scenario,Corridor; "
                 "p=json.load(sys.stdin); s=Scenario(tuple(Corridor(**c) for c in p['corridors'])); "
                 "Path(sys.argv[1]).write_text(json.dumps(s.points())); time.sleep(20)"
             )

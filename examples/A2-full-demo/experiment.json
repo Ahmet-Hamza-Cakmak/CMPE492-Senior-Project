@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "name": "Scripted wheel commands in a supplied scene",
+  "mode": "full",
+  "scene": "scenes/circuit.xml",
+  "controller": "python/main.py",
+  "route": "data/commands.json",
+  "config": {},
+  "menagerie": false
+}

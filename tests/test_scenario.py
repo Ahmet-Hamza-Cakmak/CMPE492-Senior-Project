@@ -6,8 +6,8 @@ import unittest
 
 import mujoco
 
-from line_tracker_sim import Corridor, Scenario
-from line_tracker_sim.simulation import build_model, example_robot
+from robo_sim_py import Corridor, Scenario
+from robo_sim_py.simulation import build_model, example_robot
 
 
 class ScenarioTests(unittest.TestCase):

@@ -6,8 +6,8 @@ import math
 from shapely.geometry import LineString
 
 
-WALL_HEIGHT = 1.2
-WALL_THICKNESS = 0.08
+WALL_HEIGHT = 0.3
+WALL_THICKNESS = 0.02
 
 
 @lru_cache(maxsize=32)

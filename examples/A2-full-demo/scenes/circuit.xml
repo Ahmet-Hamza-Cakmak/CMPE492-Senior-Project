@@ -1,0 +1,12 @@
+<mujoco model="full_experiment_demo">
+  <include file="../robots/robot.xml"/>
+  <visual><headlight ambient=".4 .4 .4" diffuse=".6 .6 .6"/></visual>
+  <worldbody>
+    <light pos="0 0 4"/>
+    <geom name="ground" type="plane" size="4 4 .1" rgba=".8 .85 .8 1"/>
+    <geom name="north_wall" type="box" pos="0 2 .25" size="2 .05 .25"/>
+    <geom name="south_wall" type="box" pos="0 -2 .25" size="2 .05 .25"/>
+    <geom name="east_wall" type="box" pos="2 0 .25" size=".05 2 .25"/>
+    <geom name="west_wall" type="box" pos="-2 0 .25" size=".05 2 .25"/>
+  </worldbody>
+</mujoco>

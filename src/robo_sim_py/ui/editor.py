@@ -4,20 +4,22 @@ import json
 import os
 from pathlib import Path
 import sys
+import uuid
 
-from PySide6.QtCore import QProcess, Qt
+from PySide6.QtCore import QProcess, Qt, QSettings
 from PySide6.QtWidgets import (
     QApplication, QDoubleSpinBox, QCheckBox, QComboBox, QFileDialog, QFormLayout, QFrame,
     QHBoxLayout, QHeaderView, QInputDialog, QLabel, QLineEdit, QMainWindow,
     QMessageBox, QPushButton, QSpinBox, QTableWidget, QTableWidgetItem,
-    QVBoxLayout, QWidget,
+    QVBoxLayout, QWidget, QScrollArea,
 )
 
 from ..assets import EXAMPLES, example_for_path
+from ..experiments import open_package
 from ..scenarios.library import (BUNDLED_DIRECTORY, ScenarioPreset, discover_presets,
                       load_preset, save_preset, user_scenario_directory)
 from .preview import TrackPreview
-from ..scenarios import Corridor, Scenario, LoopScenario, Terrain
+from ..scenarios import Corridor, Scenario, LoopScenario, Terrain, CIRCUITS
 
 
 STYLE = """
@@ -65,13 +67,17 @@ class ScenarioWindow(QMainWindow):
         self.current_category = "corridors"
         self.catalog = []
         self.loop_shape = "circle"
+        self.last_run_directory = None
         self.last_error_output = ""
         self.setWindowTitle("Line tracker · Scenario studio")
         self.resize(1120, 820)
         self.setMinimumSize(930, 700)
         self.setStyleSheet(STYLE)
         central = QWidget()
-        self.setCentralWidget(central)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setWidget(central)
+        self.setCentralWidget(scroll)
         layout = QVBoxLayout(central)
         layout.setContentsMargins(24, 20, 24, 20)
         layout.setSpacing(16)
@@ -81,6 +87,53 @@ class ScenarioWindow(QMainWindow):
         subtitle = QLabel("Choose a robot, shape a track, and run your experiment.")
         subtitle.setObjectName("muted")
         layout.addWidget(subtitle)
+        self.source_choice = QComboBox()
+        self.source_choice.addItem("Built-in experiments / generated tracks", "generated")
+        self.source_choice.addItem("Import MuJoCo scene XML", "scene")
+        self.source_choice.addItem("Assignment / full experiment ZIP", "full")
+        self.source_choice.addItem("Robot + controller ZIP on generated track", "robot")
+        layout.addWidget(self.source_choice)
+        self.scene_card, scene_layout = card("MuJoCo scene")
+        layout.addWidget(self.scene_card)
+        scene_row = QHBoxLayout()
+        self.scene_path = QLineEdit()
+        self.scene_path.setPlaceholderText("Select a complete scene.xml file")
+        scene_row.addWidget(self.scene_path)
+        scene_browse = QPushButton("Browse…")
+        scene_browse.clicked.connect(self.browse_scene)
+        scene_row.addWidget(scene_browse)
+        scene_layout.addLayout(scene_row)
+        scene_note = QLabel("Loads the complete scene, including any robots already in it. Keep its referenced assets "
+                            "and includes in place. No additional robot or generated track is added. "
+                            "Automatic line following is unavailable; use the viewer's actuator controls where provided.")
+        scene_note.setWordWrap(True)
+        scene_layout.addWidget(scene_note)
+        self.scene_card.hide()
+        self.package_card, package_layout = card("Experiment package")
+        layout.addWidget(self.package_card)
+        package_row = QHBoxLayout()
+        self.package_path = QLineEdit()
+        self.package_path.setPlaceholderText("Any ZIP containing python/main.py and scenes/, or experiment.json")
+        package_row.addWidget(self.package_path)
+        package_browse = QPushButton("Browse ZIP…")
+        package_browse.clicked.connect(self.browse_package)
+        package_row.addWidget(package_browse)
+        package_layout.addLayout(package_row)
+        dependency_row = QHBoxLayout()
+        dependency_row.addWidget(QLabel("Menagerie (optional)"))
+        self.menagerie_path = QLineEdit(str(QSettings("line-tracker-sim", "studio").value("menagerie", "")))
+        dependency_row.addWidget(self.menagerie_path)
+        dependency_browse = QPushButton("Choose folder…")
+        dependency_browse.clicked.connect(self.browse_menagerie)
+        dependency_row.addWidget(dependency_browse)
+        package_layout.addLayout(dependency_row)
+        package_note = QLabel("Assignment ZIPs run python/main.py directly; no JSON file is required. "
+                              "Advanced packages can use experiment.json. "
+                              "You will be asked to trust the Python code before it runs. "
+                              "A full experiment supplies its own environment; robot packages use the track below.")
+        package_note.setWordWrap(True)
+        package_layout.addWidget(package_note)
+        self.package_card.hide()
         columns = QHBoxLayout()
         columns.setSpacing(18)
         layout.addLayout(columns, 1)
@@ -89,6 +142,7 @@ class ScenarioWindow(QMainWindow):
         columns.addLayout(right, 6)
 
         robot_card, robot_layout = card("Robot")
+        self.robot_card = robot_card
         left.addWidget(robot_card)
         self.robot_choice = QComboBox()
         for example in EXAMPLES:
@@ -113,6 +167,7 @@ class ScenarioWindow(QMainWindow):
         robot_layout.addWidget(self.robot_note)
 
         scenario_card, scenario_layout = card("Scenario")
+        self.scenario_card = scenario_card
         left.addWidget(scenario_card, 1)
         self.category_choice = QComboBox()
         self.category_choice.addItem("Corridor tracks", "corridors")
@@ -161,6 +216,7 @@ class ScenarioWindow(QMainWindow):
         scenario_layout.addWidget(self.loop_note)
 
         preview_card, preview_layout = card("Track preview")
+        self.preview_card = preview_card
         right.addWidget(preview_card, 1)
         self.preview = TrackPreview()
         preview_layout.addWidget(self.preview, 1)
@@ -172,6 +228,7 @@ class ScenarioWindow(QMainWindow):
         note.setWordWrap(True)
         preview_layout.addWidget(note)
         terrain_card, terrain_layout = card("Ground surface")
+        self.terrain_card = terrain_card
         right.addWidget(terrain_card)
         terrain_form = QFormLayout()
         terrain_layout.addLayout(terrain_form)
@@ -227,6 +284,9 @@ class ScenarioWindow(QMainWindow):
         self.width.textChanged.connect(self._edited)
         self.line_width.textChanged.connect(self._edited)
         self.radius.textChanged.connect(self._edited)
+        self.source_choice.currentIndexChanged.connect(self._source_changed)
+        self.scene_path.textChanged.connect(self.refresh)
+        self.package_path.textChanged.connect(self.refresh)
         errors = []
         self.loading = True
         for directory, label in ((BUNDLED_DIRECTORY, "Built-in"), (self.library_directory, "Saved")):
@@ -239,6 +299,31 @@ class ScenarioWindow(QMainWindow):
         if errors:
             self.status.setText("Some scenario files could not be loaded. Hover for details.")
             self.status.setToolTip("\n".join(errors))
+
+    def browse_scene(self):
+        path, _ = QFileDialog.getOpenFileName(self, "Select MuJoCo scene", "", "MuJoCo XML (*.xml)")
+        if path:
+            self.scene_path.setText(path)
+
+    def browse_package(self):
+        path, _ = QFileDialog.getOpenFileName(self, "Select experiment package", "", "Experiment ZIP (*.zip)")
+        if path:
+            self.package_path.setText(path)
+
+    def browse_menagerie(self):
+        path = QFileDialog.getExistingDirectory(self, "Select mujoco_menagerie directory", self.menagerie_path.text())
+        if path:
+            self.menagerie_path.setText(path)
+            QSettings("line-tracker-sim", "studio").setValue("menagerie", path)
+
+    def _source_changed(self, *_):
+        source = self.source_choice.currentData()
+        self.scene_card.setVisible(source == "scene")
+        self.package_card.setVisible(source in ("full", "robot"))
+        self.robot_card.setVisible(source == "generated")
+        for widget in (self.scenario_card, self.preview_card, self.terrain_card):
+            widget.setVisible(source in ("generated", "robot"))
+        self.refresh()
 
     def _robot_selected(self, index):
         path = self.robot_choice.itemData(index)
@@ -331,7 +416,7 @@ class ScenarioWindow(QMainWindow):
         if closed:
             self.loop_shape = preset.scenario.shape
             self.parameters_form.labelForField(self.radius).setText(
-                "Radius (m)" if self.loop_shape == "circle" else "Circuit scale (m)")
+                CIRCUITS[self.loop_shape].size_label)
             self.radius.setText(str(preset.scenario.radius))
         else:
             self.count.setValue(len(preset.scenario.corridors))
@@ -384,6 +469,32 @@ class ScenarioWindow(QMainWindow):
             self.refresh()
 
     def refresh(self):
+        source = self.source_choice.currentData()
+        if source in ("full", "robot"):
+            valid = bool(self.package_path.text().strip()) and Path(self.package_path.text()).expanduser().is_file()
+            error = "Select an experiment ZIP."
+            if source == "robot":
+                try:
+                    selected = self.scenario()
+                    self.preview.set_scenario(selected)
+                    self.summary.setText(f"{'Closed loop' if selected.closed else 'Corridor track'} · {selected.total_length:.1f} m")
+                except ValueError as exc:
+                    valid, error = False, str(exc)
+                    self.preview.set_scenario(None)
+            running = self.process.state() != QProcess.ProcessState.NotRunning
+            self.launch_button.setEnabled(valid)
+            self.launch_button.setText("Restart experiment" if running else "Open experiment")
+            self.status.setText("Package will be validated before approval and launch." if valid else error)
+            self.save_button.setEnabled(source == "robot" and self.preview.scenario is not None)
+            return
+        if self.source_choice.currentData() == "scene":
+            running = self.process.state() != QProcess.ProcessState.NotRunning
+            valid = bool(self.scene_path.text().strip()) and Path(self.scene_path.text()).expanduser().is_file()
+            self.launch_button.setEnabled(valid)
+            self.launch_button.setText("Restart with imported scene" if running else "Open MuJoCo scene")
+            self.status.setText("Click Restart to load the selected scene." if valid and running else
+                                "Ready to load scene as supplied." if valid else "Select an existing MuJoCo scene XML.")
+            return
         try:
             scenario = self.scenario()
         except ValueError as exc:
@@ -434,11 +545,50 @@ class ScenarioWindow(QMainWindow):
 
     def launch(self):
         try:
-            preset = ScenarioPreset("Simulation", "", self.scenario())
-            robot_path = Path(self.robot_path.text()).expanduser().resolve()
-            if not robot_path.is_file():
-                raise ValueError("Select an existing robot XML file.")
-            pending_scenario = json.dumps(preset.to_dict(), allow_nan=False).encode("utf-8")
+            run_directory = None
+            source = self.source_choice.currentData()
+            if source in ("full", "robot"):
+                package_path = Path(self.package_path.text()).expanduser().resolve()
+                with open_package(package_path, menagerie_directory=self.menagerie_path.text() or None) as experiment:
+                    if experiment.mode != source and not (source == "full" and experiment.mode == "standalone"):
+                        raise ValueError(f"This ZIP is a {experiment.mode} experiment. Select the matching source mode.")
+                    if experiment.menagerie and not self.menagerie_path.text():
+                        raise ValueError("This experiment requires your local mujoco_menagerie folder.")
+                    pending_scenario = (json.dumps(ScenarioPreset("Simulation", "", self.scenario()).to_dict(),
+                                                  allow_nan=False).encode("utf-8") if source == "robot" else b"")
+                    answer = QMessageBox.question(
+                        self, "Trust experiment controller?",
+                        f"Run Python from '{experiment.name}'?\n\n"
+                        f"Controller: {experiment.controller_path.relative_to(experiment.root)}\n"
+                        f"ZIP SHA-256: {experiment.digest}\n\n"
+                        "This code can access your files and network. It runs in a separate process, "
+                        "which is not a security sandbox. Only run packages you trust.",
+                        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+                        QMessageBox.StandardButton.Cancel)
+                    if answer != QMessageBox.StandardButton.Yes:
+                        return
+                    arguments = ["-m", "robo_sim_py.simulation", "--package", str(package_path),
+                                 "--approved-sha256", experiment.digest]
+                    if experiment.mode == "standalone":
+                        run_directory = user_scenario_directory().parent / "runs" / uuid.uuid4().hex
+                        arguments.extend(["--run-directory", str(run_directory)])
+                    if experiment.menagerie or (experiment.mode == "standalone" and self.menagerie_path.text()):
+                        arguments.extend(["--menagerie", str(Path(self.menagerie_path.text()).expanduser().resolve())])
+            elif source == "scene":
+                scene_path = Path(self.scene_path.text()).expanduser().resolve()
+                if not self.scene_path.text().strip() or not scene_path.is_file():
+                    raise ValueError("Select an existing scene XML file.")
+                arguments = ["-m", "robo_sim_py.simulation", "--scene", str(scene_path)]
+                pending_scenario = b""
+            else:
+                preset = ScenarioPreset("Simulation", "", self.scenario())
+                robot_path = Path(self.robot_path.text()).expanduser().resolve()
+                if not robot_path.is_file():
+                    raise ValueError("Select an existing robot XML file.")
+                pending_scenario = json.dumps(preset.to_dict(), allow_nan=False).encode("utf-8")
+                arguments = ["-m", "robo_sim_py.simulation", "--robot", str(robot_path)]
+                if self.auto_follow.isChecked():
+                    arguments.append("--auto-follow")
         except (ValueError, OSError) as exc:
             QMessageBox.warning(self, "Cannot start simulation", str(exc))
             return
@@ -448,14 +598,12 @@ class ScenarioWindow(QMainWindow):
             if self.process.state() != QProcess.ProcessState.NotRunning:
                 self.status.setText("MuJoCo is still stopping. Try restarting again in a moment.")
                 return
+        self.last_run_directory = run_directory
         self.pending_scenario = pending_scenario
         executable = sys.executable
         if sys.platform == "darwin":
             executable = str(Path(sys.executable).with_name("mjpython"))
         self.process.setProgram(executable)
-        arguments = ["-m", "line_tracker_sim.simulation", "--robot", str(robot_path)]
-        if self.auto_follow.isChecked():
-            arguments.append("--auto-follow")
         self.process.setArguments(arguments)
         self.last_error_output = ""
         self.stopping = False
@@ -483,6 +631,8 @@ class ScenarioWindow(QMainWindow):
         self._read_errors()
         self.stop_button.setEnabled(False)
         self.refresh()
+        if self.last_run_directory and self.last_run_directory.is_dir():
+            self.status.setText(f"Experiment files and outputs kept in {self.last_run_directory / 'assignment'}")
         if code != 0 and not self.stopping:
             QMessageBox.warning(self, "Simulation error", self.last_error_output or "MuJoCo closed unexpectedly.")
 

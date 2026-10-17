@@ -1,24 +1,25 @@
 # Line tracker simulation
 
-A Python package with a PySide6 desktop editor that builds consecutive line-tracking corridors and opens a MuJoCo simulation with your robot.
+A Python package with a PySide6 desktop editor for MuJoCo robot experiments: generated circuits, imported scenes, and A2-style ZIP packages containing robots and Python controllers.
 
 ## Project organization
 
-Application code is grouped by responsibility under [src/line_tracker_sim/](src/line_tracker_sim/):
+Application code is grouped by responsibility under [src/robo_sim_py/](src/robo_sim_py/):
 
 | Area | What belongs here |
 | --- | --- |
-| [ui/](src/line_tracker_sim/ui/) | [editor.py](src/line_tracker_sim/ui/editor.py) contains the PySide6 window and process controls; [preview.py](src/line_tracker_sim/ui/preview.py) draws the track preview. |
-| [scenarios/](src/line_tracker_sim/scenarios/) | [__init__.py](src/line_tracker_sim/scenarios/__init__.py) defines corridor and loop geometry; [library.py](src/line_tracker_sim/scenarios/library.py) loads/saves scenarios; [presets/](src/line_tracker_sim/scenarios/presets/) holds the six built-in JSON configurations. |
-| [simulation/](src/line_tracker_sim/simulation/) | [__init__.py](src/line_tracker_sim/simulation/__init__.py) builds and runs MuJoCo models; [walls.py](src/line_tracker_sim/simulation/walls.py) calculates wall geometry; [__main__.py](src/line_tracker_sim/simulation/__main__.py) is the separate viewer process entry point. |
-| [assets/](src/line_tracker_sim/assets/) | [__init__.py](src/line_tracker_sim/assets/__init__.py) registers robot examples; [tracking.py](src/line_tracker_sim/assets/tracking.py) provides shared driving logic. Each robot folder keeps its controller, XML, and supporting assets together. |
+| [ui/](src/robo_sim_py/ui/) | [editor.py](src/robo_sim_py/ui/editor.py) contains the PySide6 window and process controls; [preview.py](src/robo_sim_py/ui/preview.py) draws the track preview. |
+| [scenarios/](src/robo_sim_py/scenarios/) | [__init__.py](src/robo_sim_py/scenarios/__init__.py) defines corridor and loop geometry; [library.py](src/robo_sim_py/scenarios/library.py) loads/saves scenarios; [presets/](src/robo_sim_py/scenarios/presets/) holds the six built-in JSON configurations. |
+| [simulation/](src/robo_sim_py/simulation/) | [__init__.py](src/robo_sim_py/simulation/__init__.py) builds and runs MuJoCo models; [walls.py](src/robo_sim_py/simulation/walls.py) calculates wall geometry; [__main__.py](src/robo_sim_py/simulation/__main__.py) is the separate viewer process entry point. |
+| [assets/](src/robo_sim_py/assets/) | [__init__.py](src/robo_sim_py/assets/__init__.py) registers robot examples; [tracking.py](src/robo_sim_py/assets/tracking.py) provides shared driving logic. Each robot folder keeps its controller, XML, and supporting assets together. |
+| [experiments/](src/robo_sim_py/experiments/) | Validates ZIP packages and manifests; defines the controller context, lifecycle and robot placement. |
 | [tests/](tests/) | Geometry, driving, UI, persistence, and worker-process regression tests. |
 
-The package's [__main__.py](src/line_tracker_sim/__main__.py) is intentionally small: it starts the editor. Small robot controller files are also intentional—they configure shared tracking logic rather than duplicate it. Package marker files establish Python import boundaries.
+The package's [__main__.py](src/robo_sim_py/__main__.py) is intentionally small: it starts the editor. Small robot controller files are also intentional—they configure shared tracking logic rather than duplicate it. Package marker files establish Python import boundaries.
 
 To change the UI, start in the UI folder. To add a preset, add JSON in the preset folder. To add a robot, create its asset folder and register it in the asset registry. To change physics or walls, use the simulation folder.
 
-The launch commands and the public imports `from line_tracker_sim import Corridor, Scenario, LoopScenario` and `from line_tracker_sim.simulation import build_model, example_robot, run` remain unchanged. Internal imports moved to their corresponding areas; the old flat modules are removed. User-saved scenarios remain in the same application-data directory and require no migration.
+The launch commands and the public imports `from robo_sim_py import Corridor, Scenario, LoopScenario` and `from robo_sim_py.simulation import build_model, example_robot, run` remain unchanged. Internal imports moved to their corresponding areas; the old flat modules are removed. User-saved scenarios remain in the same application-data directory and require no migration.
 
 ## Install and run
 
@@ -26,7 +27,7 @@ Requires Python 3.10 or newer and a desktop with OpenGL support.
 
 ```bash
 python -m pip install "git+https://github.com/Ahmet-Hamza-Cakmak/CMPE492-Senior-Project.git"
-line-tracker-sim
+robo-sim-py
 ```
 
 The GitHub command works once these changes are pushed to the repository's default branch. For a local checkout:
@@ -35,10 +36,16 @@ The GitHub command works once these changes are pushed to the repository's defau
 python -m venv .venv
 source .venv/bin/activate
 python -m pip install .
-python -m line_tracker_sim
+python -m robo_sim_py
 ```
 
 On Windows activate with `.venv\Scripts\activate`. PySide6 (Qt) is installed by pip; Tkinter is no longer required. On macOS start the editor with normal Python; it launches the MuJoCo worker using `mjpython` automatically. Linux desktop Qt requires the usual system graphics libraries; if Qt reports a missing `xcb-cursor` dependency on Ubuntu/Debian, install `libxcb-cursor0`.
+
+## Choose an experiment mode
+
+The top selector offers built-in experiments, **Assignment / full experiment ZIP**, **Robot + controller ZIP on generated track**, and direct scene XML loading. Existing track controls remain available for built-ins and robot packages. Full packages supply their own environment. Standard assignment ZIPs containing `python/main.py` and `scenes/` work without `experiment.json` or any particular ZIP/folder name; their script owns the simulation and generated files are retained in a run directory. Imported Python controllers require explicit trust approval and run in the separate simulation worker.
+
+See [the experiment guide](docs/experiments.md) for the ZIP layout, `experiment.json`, controller API, Menagerie dependencies and extension registries. Runnable source examples are in [examples/](examples/); run `python examples/make_packages.py` to create both demo ZIPs, then browse to one in its matching mode.
 
 ## Create a scenario
 
@@ -49,13 +56,13 @@ On Windows activate with `.venv\Scripts\activate`. PySide6 (Qt) is installed by 
 5. Leave **Automatically follow the line** checked to drive a bundled robot, or uncheck it for manual control. Custom XML has no automatic controller.
 6. Click **Open MuJoCo simulation**. The editor remains responsive while MuJoCo runs in its own process. After selecting another scenario or editing parameters, click **Restart with selected scenario** to replace the running simulation. Selecting a preset updates the preview immediately; it does not change an already running MuJoCo world until you restart. Close the viewer or click **Stop simulation** to finish.
 
-The corridors have white floors, black center lines, and solid light-gray walls on both sides. Walls are 1.2 m high and 8 cm thick, outside the specified usable corridor width. Corridor starts and finishes remain open; loop walls join continuously around the circuit. Consecutive strips share endpoints and have filled round joins; the walls follow the combined outline so they do not block the connections at bends or intersections. The editor preview shows the same wall layout. Sharp turns and self-intersections are allowed; intersecting tracks can create ambiguous routes for a future controller. The black line is visual and does not affect wheel contact, while the walls have physical collision enabled.
+The corridors have white floors, black center lines, and solid light-gray walls on both sides. Walls are 0.3 m high and 2 cm thick, outside the specified usable corridor width. Corridor starts and finishes remain open; loop walls join continuously around the circuit. Consecutive strips share endpoints and have filled round joins; the walls follow the combined outline so they do not block the connections at bends or intersections. The editor preview shows the same wall layout. Sharp turns and self-intersections are allowed; intersecting tracks can create ambiguous routes for a future controller. The black line is visual and does not affect wheel contact, while the walls have physical collision enabled.
 
 ## Scenario library
 
 Presets are versioned JSON files, independent of the robot model and controller. Both example robots can run the bundled presets. You can use the form to make a custom track and save it under a new name; saving never overwrites a bundled preset.
 
-Built-in scenarios live in [scenarios/presets/](src/line_tracker_sim/scenarios/presets/). To ship another corridor scenario, add a JSON file there using this format and reinstall (or use an editable install). No GUI registration or Python changes are required:
+Built-in scenarios live in [scenarios/presets/](src/robo_sim_py/scenarios/presets/). To ship another corridor scenario, add a JSON file there using this format and reinstall (or use an editable install). No GUI registration or Python changes are required:
 
 ```json
 {
@@ -79,7 +86,7 @@ User scenarios are loaded automatically on the next launch from:
 
 **Import JSON…** loads a file for the current session; use **Save to library…** to retain it between launches. Invalid scenario files are reported without preventing other presets from loading. Version 1 describes corridor tracks and remains supported unchanged. Version 2 supports the loop type described below. Other environment types, such as obstacle fields, would also need a new geometry builder.
 
-[scenarios/library.py](src/line_tracker_sim/scenarios/library.py) handles validation, discovery, and persistence. [ui/editor.py](src/line_tracker_sim/ui/editor.py) manages the Qt editor, [ui/preview.py](src/line_tracker_sim/ui/preview.py) draws the schematic, and [simulation/__main__.py](src/line_tracker_sim/simulation/__main__.py) launches the separate MuJoCo process. The physics and controllers remain independent of the UI toolkit.
+[scenarios/library.py](src/robo_sim_py/scenarios/library.py) handles validation, discovery, and persistence. [ui/editor.py](src/robo_sim_py/ui/editor.py) manages the Qt editor, [ui/preview.py](src/robo_sim_py/ui/preview.py) draws the schematic, and [simulation/__main__.py](src/robo_sim_py/simulation/__main__.py) launches the separate MuJoCo process. The physics and controllers remain independent of the UI toolkit.
 
 ## Loop tracks
 
@@ -125,27 +132,27 @@ After updating the source, reinstall before launching (or use `python -m pip ins
 
 ```bash
 python -m pip install .
-python -m line_tracker_sim
+python -m robo_sim_py
 ```
 
 ## Example layout and adding robots
 
 Each example keeps its model and controller together:
 
-- [assets/simple_robot/](src/line_tracker_sim/assets/simple_robot/): [robot.xml](src/line_tracker_sim/assets/simple_robot/robot.xml) and [controller.py](src/line_tracker_sim/assets/simple_robot/controller.py).
-- [assets/google_robot/](src/line_tracker_sim/assets/google_robot/): [robot.xml](src/line_tracker_sim/assets/google_robot/robot.xml), [controller.py](src/line_tracker_sim/assets/google_robot/controller.py), meshes/textures, upstream license, and [adaptation notes](src/line_tracker_sim/assets/google_robot/MODEL_NOTES.md).
+- [assets/simple_robot/](src/robo_sim_py/assets/simple_robot/): [robot.xml](src/robo_sim_py/assets/simple_robot/robot.xml) and [controller.py](src/robo_sim_py/assets/simple_robot/controller.py).
+- [assets/google_robot/](src/robo_sim_py/assets/google_robot/): [robot.xml](src/robo_sim_py/assets/google_robot/robot.xml), [controller.py](src/robo_sim_py/assets/google_robot/controller.py), meshes/textures, upstream license, and [adaptation notes](src/robo_sim_py/assets/google_robot/MODEL_NOTES.md).
 
 The Google example adapts the Menagerie fixed-base robot with a free base, driven wheels, approximate base inertia and support contacts. Its controller holds the arm while driving. The original Menagerie checkout is not needed at runtime. The added base dynamics are approximations, not a hardware-calibrated model. Start with the default 0.8 m corridor width or wider.
 
-[assets/tracking.py](src/line_tracker_sim/assets/tracking.py) contains the shared steering and wheel-feedback algorithm. Robot-specific controllers configure or extend it. [assets/__init__.py](src/line_tracker_sim/assets/__init__.py) maps each bundled model to its controller and supplies the GUI choices. The obsolete top-level controller wrapper has been removed; import a robot-specific controller directly if needed.
+[assets/tracking.py](src/robo_sim_py/assets/tracking.py) contains the shared steering and wheel-feedback algorithm. Robot-specific controllers configure or extend it. [assets/__init__.py](src/robo_sim_py/assets/__init__.py) maps each bundled model to its controller and supplies the GUI choices. The obsolete top-level controller wrapper has been removed; import a robot-specific controller directly if needed.
 
 To add another supported example, create a package under the assets directory with its model, assets, controller and `__init__.py`, then register a `RobotExample` in the registry. Controllers accept `(model, scenario)` and provide `update(data)`. Registering it makes it appear in the GUI without adding robot-specific GUI or simulation branches. Custom XML can still be loaded for manual simulation; Python files beside arbitrary XML are never automatically executed. Additional asset file formats must also be included in the package-data configuration.
 
 ## Python API and verification
 
 ```python
-from line_tracker_sim import Corridor, Scenario
-from line_tracker_sim.simulation import build_model, example_robot, run
+from robo_sim_py import Corridor, Scenario
+from robo_sim_py.simulation import build_model, example_robot, run
 
 scenario = Scenario((Corridor(2), Corridor(1.5, 90), Corridor(2, -45)))
 robot_path = example_robot("google_robot")  # or "simple_robot"
@@ -174,8 +181,18 @@ The surface is a collidable MuJoCo `hfield`, with the road and line painted onto
 "terrain": {"mode": "random", "height": 0.003, "spacing": 0.8, "resolution": 129, "seed": 42}
 ```
 
-JSON/Python height uses **metres**; the GUI displays **centimetres**. In Python, pass `terrain=Terrain("random", height=0.003, spacing=0.8, resolution=129, seed=42)` to `Scenario` or `LoopScenario` (import `Terrain` from `line_tracker_sim`). Generation and surface painting live in [simulation/terrain.py](src/line_tracker_sim/simulation/terrain.py).
+JSON/Python height uses **metres**; the GUI displays **centimetres**. In Python, pass `terrain=Terrain("random", height=0.003, spacing=0.8, resolution=129, seed=42)` to `Scenario` or `LoopScenario` (import `Terrain` from `robo_sim_py`). Generation and surface painting live in [simulation/terrain.py](src/robo_sim_py/simulation/terrain.py).
 
 The existing controllers were tuned for flat ground. The Google example can stall on slopes or at turns, even with small bumps; successful completion is not guaranteed. Terrain settings deliberately allow experiments beyond either robot's capabilities.
 
 If bumps look flat, remember that the default 0.3 cm is only 3 mm. For a visual inspection, disable automatic driving and try 5–10 cm height with 0.8 m spacing, then click **Restart with selected scenario** (or open a new simulation). These larger bumps may be undrivable. The start patch remains level; inspect the surface farther along the track. Tall walls can obscure the road from low camera angles. Terrain uses oblique lighting to make slopes easier to distinguish.
+
+## Import a complete MuJoCo scene
+
+Choose **Import MuJoCo scene XML** in the source selector at the top of the editor, browse to the scene's XML, and click **Open MuJoCo scene**. Use **Restart with imported scene** to replace a running simulation. Switch back to **Generated track** to return to the existing robot, circuit, and terrain editor; its settings are retained.
+
+This mode loads the scene **as supplied** using MuJoCo's XML loader. Relative includes, meshes, and textures must remain in their expected folders. The scene's environment, included robots, physics options, and lighting are preserved; no generated floor, walls, or extra robot are added. XML or missing-asset errors appear in the editor.
+
+An environment-only XML opens without a robot. To drive a robot in it, the complete scene XML must already include that robot and its actuators. Combining a separately selected robot with an imported environment is not part of this mode. Automatic line following is unavailable because an arbitrary scene does not define our controller's ordered route. Where actuators exist, their controls are available in the MuJoCo viewer; there is no new keyboard driving controller. Importing a scene does not execute Python controllers beside the XML.
+
+Imported scenes are selected directly from disk; **Import JSON** and **Save to library** remain specific to generated scenarios. From Python, use `load_scene(path)` and `run(model)` from `robo_sim_py.simulation`.

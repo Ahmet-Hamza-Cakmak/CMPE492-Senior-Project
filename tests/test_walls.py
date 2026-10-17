@@ -3,9 +3,9 @@ import unittest
 import mujoco
 from shapely.geometry import LineString
 
-from line_tracker_sim import Corridor, Scenario
-from line_tracker_sim.simulation import build_model, example_robot
-from line_tracker_sim.simulation.walls import WALL_THICKNESS, wall_segments
+from robo_sim_py import Corridor, Scenario
+from robo_sim_py.simulation import build_model, example_robot
+from robo_sim_py.simulation.walls import WALL_THICKNESS, wall_segments
 
 
 class WallTests(unittest.TestCase):
