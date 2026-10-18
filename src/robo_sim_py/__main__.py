@@ -1,3 +1,3 @@
-from .ui.editor import main
+from .cli import main
 
-main()
+raise SystemExit(main())

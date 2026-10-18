@@ -652,12 +652,12 @@ class ScenarioWindow(QMainWindow):
         event.accept()
 
 
-def main():
+def main(argv=None):
     if sys.platform.startswith("linux") and not (
         os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY") or os.environ.get("QT_QPA_PLATFORM")
     ):
         raise SystemExit("A desktop display is required to open the scenario editor.")
-    app = QApplication.instance() or QApplication(sys.argv)
+    app = QApplication.instance() or QApplication(sys.argv if argv is None else argv)
     app.setStyle("Fusion")
     window = ScenarioWindow()
     window.show()

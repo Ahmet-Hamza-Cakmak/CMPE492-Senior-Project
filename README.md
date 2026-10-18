@@ -15,11 +15,11 @@ Application code is grouped by responsibility under [src/robo_sim_py/](src/robo_
 | [experiments/](src/robo_sim_py/experiments/) | Validates ZIP packages and manifests; defines the controller context, lifecycle and robot placement. |
 | [tests/](tests/) | Geometry, driving, UI, persistence, and worker-process regression tests. |
 
-The package's [__main__.py](src/robo_sim_py/__main__.py) is intentionally small: it starts the editor. Small robot controller files are also intentional—they configure shared tracking logic rather than duplicate it. Package marker files establish Python import boundaries.
+The package's [__main__.py](src/robo_sim_py/__main__.py) is intentionally small: it starts the terminal interface; `--gui` opens the editor. Small robot controller files are also intentional—they configure shared tracking logic rather than duplicate it. Package marker files establish Python import boundaries.
 
 To change the UI, start in the UI folder. To add a preset, add JSON in the preset folder. To add a robot, create its asset folder and register it in the asset registry. To change physics or walls, use the simulation folder.
 
-The launch commands and the public imports `from robo_sim_py import Corridor, Scenario, LoopScenario` and `from robo_sim_py.simulation import build_model, example_robot, run` remain unchanged. Internal imports moved to their corresponding areas; the old flat modules are removed. User-saved scenarios remain in the same application-data directory and require no migration.
+The public imports `from robo_sim_py import Corridor, Scenario, LoopScenario` and `from robo_sim_py.simulation import build_model, example_robot, run` remain unchanged. Internal imports moved to their corresponding areas; the old flat modules are removed. User-saved scenarios remain in the same application-data directory and require no migration.
 
 ## Install and run
 
@@ -40,6 +40,92 @@ python -m robo_sim_py
 ```
 
 On Windows activate with `.venv\Scripts\activate`. PySide6 (Qt) is installed by pip; Tkinter is no longer required. On macOS start the editor with normal Python; it launches the MuJoCo worker using `mjpython` automatically. Linux desktop Qt requires the usual system graphics libraries; if Qt reports a missing `xcb-cursor` dependency on Ubuntu/Debian, install `libxcb-cursor0`.
+
+## Command-line interface
+
+Run `robo-sim-py` or `python -m robo_sim_py` to enter the interactive terminal interface.
+When input is redirected, the default command prints help instead of waiting for input.
+Open the existing desktop editor explicitly:
+
+```bash
+robo-sim-py --gui
+# Equivalent:
+python -m robo_sim_py --gui
+```
+
+Use `--help` or `run --help` for all options. Commands work both inside the
+`robo-sim>` prompt and directly from your terminal (prefix them with `robo-sim-py`).
+
+```bash
+robo-sim-py list robots
+robo-sim-py list presets
+robo-sim-py run --preset 05_circle --robot simple_robot
+robo-sim-py run --loop figure_eight --radius 3 --robot google_robot --no-auto-follow
+robo-sim-py run --corridor 2 0 --corridor 1.5 90 --width 0.8
+robo-sim-py run --scenario my-track.json --terrain random --height 0.003 --seed 42
+robo-sim-py run --robot /path/to/robot.xml --scenario my-track.json
+robo-sim-py run --scene /path/to/scene.xml
+```
+
+Preset selectors accept an exact display name (quoted if it contains spaces) or the
+file stem shown by `list presets`. Built-in and saved presets are both available.
+Custom robots default to manual controls; registered robots default to automatic
+line following. `--auto-follow` and `--no-auto-follow` override that default for
+registered robots. All dimensions, including terrain `--height`, use **metres**;
+turns use degrees. Repeat `--corridor LENGTH TURN` for each section, starting with
+a zero turn. Use `--spacing`, `--resolution`, `--line-width`, and `--radius` to
+configure the same parameters as the editor. JSON/preset settings are loaded first,
+then explicit options override them.
+
+Inspect, edit, export, import into the library, and preview scenarios:
+
+```bash
+robo-sim-py scenario --loop circle --radius 3 --name "My circuit" --output my-track.json
+robo-sim-py scenario --scenario my-track.json --name "Saved circuit" --save
+robo-sim-py scenario --scenario my-track.json --width 1
+robo-sim-py preview --scenario my-track.json
+robo-sim-py validate my-track.json
+robo-sim-py validate /path/to/scene.xml
+robo-sim-py validate /path/to/experiment.zip
+```
+
+`scenario` prints JSON when neither `--save` nor `--output` is supplied.
+`--description` changes the description; `--library DIRECTORY` selects an alternative
+saved-scenario library. Exports refuse to overwrite existing files. `preview` opens
+the same top-down schematic as the editor and needs a desktop display.
+
+ZIP modes are detected automatically. Validation does not execute their Python code.
+Execution requires explicit trust, just as in the editor:
+
+```bash
+robo-sim-py run --package robot.zip --preset 05_circle --trust-package
+robo-sim-py run --package full-experiment.zip --trust-package
+robo-sim-py run --package assignment.zip --menagerie /path/to/mujoco_menagerie --trust-package
+```
+
+Only robot ZIPs accept generated-track options. Full experiments and standalone
+assignments provide their own environment. `--menagerie` supplies the optional local
+dependency; standalone assignments also accept `--run-directory DIRECTORY` to retain
+outputs at a chosen location. Imported Python has access to your files and network;
+the simulation worker is a separate process, not a security sandbox.
+
+In the interactive prompt, `run ...` starts the worker and returns control immediately.
+Use `status`, `stop`, and `restart` to manage it. `restart --preset 05_circle` replaces
+the run configuration; `restart` alone repeats the last request. A new `run ...`
+validates its inputs before stopping the previous worker. `exit`, Ctrl+D, or Ctrl+C
+at the prompt stops the worker and exits. Blank input does not repeat commands.
+`--gui` opens the editor from the prompt too. Close preview/editor windows to return.
+
+Direct terminal runs wait until the viewer closes; Ctrl+C stops them. Successful
+commands return exit code 0, runtime/validation errors return 1, invalid command
+syntax returns 2, and interrupted direct runs return 130. Viewer runs need a desktop
+with OpenGL; this interface does not add headless simulation or batch execution.
+
+After changing the installed console entry point, reinstall once:
+
+```bash
+python -m pip install -e .
+```
 
 ## Choose an experiment mode
 
@@ -196,3 +282,46 @@ This mode loads the scene **as supplied** using MuJoCo's XML loader. Relative in
 An environment-only XML opens without a robot. To drive a robot in it, the complete scene XML must already include that robot and its actuators. Combining a separately selected robot with an imported environment is not part of this mode. Automatic line following is unavailable because an arbitrary scene does not define our controller's ordered route. Where actuators exist, their controls are available in the MuJoCo viewer; there is no new keyboard driving controller. Importing a scene does not execute Python controllers beside the XML.
 
 Imported scenes are selected directly from disk; **Import JSON** and **Save to library** remain specific to generated scenarios. From Python, use `load_scene(path)` and `run(model)` from `robo_sim_py.simulation`.
+
+
+## Generate a scene without opening the application
+
+The CLI can build the existing ground and wall structures and export an
+**environment-only** MuJoCo scene without starting Qt, a viewer, or a simulation:
+
+```bash
+python -m robo_sim_py generate --corridor 2 0 --corridor 1.5 90 --terrain flat --output scene.xml
+python -m robo_sim_py generate --loop circle --radius 2 --terrain waves --height 0.02 --output waves.xml
+python -m robo_sim_py generate --preset 04_zigzag --terrain random --seed 7 --output bumps.xml
+python -m robo_sim_py validate scene.xml
+python -m robo_sim_py run --scene scene.xml
+```
+
+`generate` accepts the same preset, scenario JSON, corridor, loop, width, and terrain
+options as `run`. Its output defaults to `scene.xml`; existing files are never
+overwritten. The output's parent directory must already exist. Random terrain
+uses the existing seed; wall layouts still come from explicit corridors or loop
+parameters, rather than a new random maze generator.
+
+Flat exports need only the XML. Uneven terrain also produces a sibling directory,
+for example `waves_assets/`, containing the road-marking PNG. Keep that directory
+beside the XML when moving or sharing it. Height-field elevations are stored in
+the XML itself. Existing asset directories are not overwritten either.
+
+The exported scene has no robot or automatic controller. `run --scene` opens it
+for inspection using the existing scene-loading workflow. To run a bundled robot
+with automatic following, use the same generation options with `run` instead:
+
+```bash
+python -m robo_sim_py run --preset 04_zigzag --terrain random --seed 7 --robot simple_robot
+```
+
+Both CLI generation and the existing GUI/robot workflow use the ordered pipeline
+in `simulation/generation.py`: ground and road markings, terrain-aware walls,
+then lighting. A `GenerationContext` carries the MuJoCo spec, scenario, defaults,
+and generated terrain (including elevation queries). `GenerationPipeline` accepts
+an ordered tuple of stage callables, so future static and dynamic obstacle stages
+can be inserted after walls without changing the ground or wall builders. No
+obstacle stages are implemented yet. Existing presets and scenario JSON remain
+compatible; save the scenario JSON alongside an export when you want to retain
+editable generation parameters.
