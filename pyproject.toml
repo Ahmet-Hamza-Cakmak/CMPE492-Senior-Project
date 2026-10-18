@@ -10,6 +10,9 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = ["numpy>=1.24", "mujoco>=3.3.5,<4", "PySide6>=6.8,<7", "shapely>=2,<3"]
 
+[project.optional-dependencies]
+scenic = ["scenic>=3.1,<4"]
+
 [project.scripts]
 robo-sim-py = "robo_sim_py.cli:main"
 
@@ -17,4 +20,4 @@ robo-sim-py = "robo_sim_py.cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-robo_sim_py = ["assets/**/*.xml", "assets/**/*.stl", "assets/**/*.obj", "assets/**/*.png", "assets/**/LICENSE", "assets/**/*.md", "scenarios/presets/*.json"]
+robo_sim_py = ["assets/**/*.xml", "assets/**/*.stl", "assets/**/*.obj", "assets/**/*.png", "assets/**/LICENSE", "assets/**/*.md", "scenarios/presets/*.json", "scenarios/scenic/*.scenic"]

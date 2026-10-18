@@ -145,6 +145,13 @@ class GenerationPipeline:
     def build(self, spec, scenario):
         import mujoco
 
+        if spec.find_default("line_tracker_environment") is not None:
+            raise ValueError(
+                "This XML already defines a generated environment and cannot be used "
+                "as a robot model. In the GUI, select 'Import MuJoCo scene XML' "
+                "in the top source selector, then choose this file. "
+                "In the CLI, use: run --scene PATH_TO_XML."
+            )
         clean_spec = mujoco.MjSpec()
         default = spec.add_default("line_tracker_environment", spec.default)
         default.geom = clean_spec.default.geom

@@ -63,7 +63,10 @@ Use help COMMAND inside the prompt, or COMMAND --help in either context.""")
         item.epilog = ("""Examples (inside robo-sim>; prepend python -m robo_sim_py in a terminal):
 """ + examples[action] + """
 
-Choose at most one source: --preset, --scenario, --loop, or repeated --corridor.
+Choose at most one source: --scenic, --preset, --scenario, --loop, or repeated --corridor.
+Scenic samples flat ground, 2-8 corridors, one shared width, and relative turns.
+Example: generate --scenic --scenic-seed 7 --output scene.xml
+Scenic files execute code: use trusted sources only.
 Without a source, the default is a straight 2 m corridor. Additional flags
 replace selected preset/JSON settings; omitted flags retain those settings.
 New tracks default to width 0.8 m, line width 0.025 m, and flat terrain.
@@ -79,6 +82,8 @@ run --scene opens the exported environment for inspection. Use run with the
 same track options and --robot to simulate a robot on the generated track.
 """
         source = item.add_mutually_exclusive_group()
+        source.add_argument("--scenic", type=Path, nargs="?", const=Path(__file__).parent / "scenarios/scenic/flat_corridors.scenic", help="sample a trusted Scenic file, or omit the path for bundled flat corridors; requires the scenic extra")
+        item.add_argument("--scenic-seed", type=int, default=None, help="Scenic sampling seed (default: 42); requires --scenic; independent of terrain --seed")
         source.add_argument("--preset", help="preset file stem or exact display name; see list presets")
         source.add_argument("--scenario", type=Path, help="import a scenario JSON file")
         source.add_argument("--loop", choices=tuple(CIRCUITS), help="closed wall layout: circle or figure_eight; default radius/scale 2 m")
@@ -125,7 +130,12 @@ def catalog(directory):
 
 
 def selected_preset(args):
-    if args.scenario:
+    if getattr(args, "scenic_seed", None) is not None and not getattr(args, "scenic", None):
+        raise ValueError("--scenic-seed requires --scenic.")
+    if getattr(args, "scenic", None):
+        from .scenarios.scenic_adapter import sample_scenic
+        preset = sample_scenic(args.scenic, seed=42 if args.scenic_seed is None else args.scenic_seed)
+    elif args.scenario:
         preset = load_preset(args.scenario.expanduser())
     elif args.preset:
         matches = [preset for path, preset, _ in catalog(args.library)
@@ -156,7 +166,7 @@ def worker_request(args):
     from .assets import EXAMPLES, example_for_path
     arguments = ["-m", "robo_sim_py.simulation"]
     payload = b""
-    track_options = ("preset", "scenario", "loop", "corridor", "width", "line_width", "radius",
+    track_options = ("scenic", "scenic_seed", "preset", "scenario", "loop", "corridor", "width", "line_width", "radius",
                      "terrain", "height", "spacing", "resolution", "seed")
     if args.scene or args.package:
         if args.auto_follow is not None:

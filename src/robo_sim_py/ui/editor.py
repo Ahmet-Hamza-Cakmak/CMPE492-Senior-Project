@@ -187,6 +187,10 @@ class ScenarioWindow(QMainWindow):
         library_buttons.addWidget(import_button)
         library_buttons.addWidget(self.save_button)
         scenario_layout.addLayout(library_buttons)
+        self.scenic_button = QPushButton("Sample Scenic flat corridors…")
+        self.scenic_button.setToolTip("Sample 2–8 connected corridors, a shared width, and relative turns on flat ground. Requires the scenic extra.")
+        self.scenic_button.clicked.connect(self.sample_scenic_scenario)
+        scenario_layout.addWidget(self.scenic_button)
         form = self.parameters_form = QFormLayout()
         self.count = QSpinBox()
         self.count.setRange(1, 100)
@@ -514,6 +518,28 @@ class ScenarioWindow(QMainWindow):
         self.status.setText("MuJoCo is running the previous launch. Click Restart to apply the selected scenario." if running else
                             "Edited scenario · save to library to keep your changes." if self.dirty else
                             "Ready to simulate")
+
+    def sample_scenic_scenario(self):
+        seed, accepted = QInputDialog.getInt(
+            self, "Sample Scenic corridors", "Sampling seed (same seed reproduces the same track):",
+            getattr(self, "scenic_sampling_seed", 42), 0, 2147483647,
+        )
+        if not accepted or not self._discard_edits():
+            return
+        try:
+            from ..scenarios.scenic_adapter import sample_scenic
+            preset = sample_scenic(seed=seed)
+            self.scenic_sampling_seed = seed
+            # Select the matching category as well as the preset list.
+            self.loading = True
+            self.category_choice.setCurrentIndex(self.category_choice.findData("corridors"))
+            self.loading = False
+            self._add_preset(preset, "Scenic")
+            self.dirty = True
+            self.refresh()
+            self.status.setText(f"Scenic sample, seed {seed} · flat ground · shared corridor width. Save to library to keep it.")
+        except (OSError, ValueError) as exc:
+            QMessageBox.warning(self, "Cannot sample Scenic scenario", str(exc))
 
     def import_scenario(self):
         path, _ = QFileDialog.getOpenFileName(self, "Import scenario", "", "Scenario JSON (*.json)")

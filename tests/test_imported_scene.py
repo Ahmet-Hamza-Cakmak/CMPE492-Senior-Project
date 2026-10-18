@@ -5,11 +5,26 @@ from unittest.mock import patch
 
 import mujoco
 
-from robo_sim_py.simulation import load_scene
+from robo_sim_py.simulation import load_scene, build_model
 from robo_sim_py.simulation.__main__ import main
 
 
 class ImportedSceneTests(unittest.TestCase):
+    def test_generated_scene_import_and_robot_selection_error(self):
+        from robo_sim_py import Scenario, Corridor
+        from robo_sim_py.simulation.generation import export_scene
+
+        with tempfile.TemporaryDirectory() as directory:
+            scenario = Scenario((Corridor(2),))
+            path = export_scene(scenario, Path(directory) / 'scene.xml')
+            self.assertGreater(load_scene(path).ngeom, 0)
+            with self.assertRaisesRegex(ValueError, 'Import MuJoCo scene XML'):
+                build_model(path, scenario)
+            with patch('sys.argv', ['worker', '--scene', str(path)]), \
+                 patch('robo_sim_py.simulation.__main__.run') as viewer:
+                self.assertEqual(main(), 0)
+                self.assertGreater(viewer.call_args.args[0].ngeom, 0)
+
     def test_scene_keeps_assets_physics_and_robot(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

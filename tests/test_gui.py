@@ -32,6 +32,29 @@ class EditorTests(unittest.TestCase):
         self.app.processEvents()
         self.directory.cleanup()
 
+    def test_scenic_sample_loads_editable_corridors_from_loop_category(self):
+        from robo_sim_py import Corridor, Scenario
+        from robo_sim_py.scenarios.library import ScenarioPreset
+        preset = ScenarioPreset("Scenic sample", "Flat sampled corridors", Scenario((Corridor(3), Corridor(2, 45)), width=1.2))
+        self.window.category_choice.setCurrentIndex(self.window.category_choice.findData("loops"))
+        with patch('robo_sim_py.ui.editor.QInputDialog.getInt', return_value=(7, True)), \
+             patch('robo_sim_py.scenarios.scenic_adapter.sample_scenic', return_value=preset) as sample:
+            self.window.scenic_button.click()
+        sample.assert_called_once_with(seed=7)
+        self.assertEqual(self.window.category_choice.currentData(), 'corridors')
+        self.assertEqual(self.window.scenario(), preset.scenario)
+        self.assertTrue(self.window.dirty)
+        self.assertEqual(self.window.preview.scenario, preset.scenario)
+
+    def test_scenic_sampling_failure_preserves_current_scenario(self):
+        original = self.window.scenario()
+        with patch('robo_sim_py.ui.editor.QInputDialog.getInt', return_value=(7, True)), \
+             patch('robo_sim_py.scenarios.scenic_adapter.sample_scenic', side_effect=ValueError('Missing optional Scenic')), \
+             patch.object(QMessageBox, 'warning') as warning:
+            self.window.scenic_button.click()
+        warning.assert_called_once()
+        self.assertEqual(self.window.scenario(), original)
+
     def test_assignment_zip_without_manifest_launches_as_script(self):
         from zipfile import ZipFile
         archive_path = Path(self.directory.name) / "whatever.zip"

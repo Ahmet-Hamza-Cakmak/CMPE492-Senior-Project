@@ -325,3 +325,54 @@ can be inserted after walls without changing the ground or wall builders. No
 obstacle stages are implemented yet. Existing presets and scenario JSON remain
 compatible; save the scenario JSON alongside an export when you want to retain
 editable generation parameters.
+
+## Scenic flat-corridor scenario
+
+Install the optional integration in the Python environment used to run the app:
+
+```bash
+python -m pip install -e ".[scenic]"
+```
+
+The bundled [flat_corridors.scenic](src/robo_sim_py/scenarios/scenic/flat_corridors.scenic)
+models one family of environments: flat ground, 2–8 connected corridor sections,
+a shared width sampled uniformly from 0.8–1.5 m, section lengths from 2–4 m,
+and relative turns from -75 to +75 degrees. The first section always starts
+along +X with a zero turn. **All sections in one sample share one width**,
+matching the existing track geometry and editor. Different samples have different
+widths; per-section widths are not implemented. Edit the Scenic distributions to
+change this family. These constraints do not guarantee robot traversability or
+prevent a route from crossing itself.
+
+From a terminal:
+
+```bash
+python -m robo_sim_py generate --scenic --scenic-seed 7 --output scene.xml
+python -m robo_sim_py scenario --scenic --scenic-seed 7 --output sampled-track.json
+python -m robo_sim_py preview --scenic --scenic-seed 7
+python -m robo_sim_py run --scenic --scenic-seed 7 --robot simple_robot
+```
+
+Inside `robo-sim>`, omit `python -m robo_sim_py`. `--scenic` selects the bundled
+file; `--scenic path/to/file.scenic` selects a custom trusted file following the
+same parameter schema. It is mutually exclusive with other track sources.
+Existing width/terrain flags can override sampled settings afterward, just as
+for JSON presets; the bundled scenario itself always samples flat terrain.
+`--scenic-seed` defaults to 42 and is separate from the ordinary terrain `--seed`.
+Save sampled JSON for replay across Scenic versions, where seeded results may
+change. Scenic source executes Python code; load only trusted files.
+
+In the GUI's **Scenario** card, click **Sample Scenic flat corridors…** and enter
+a sampling seed. The generated corridor count, width, lengths, turns, and flat
+ground appear in the existing editable controls and preview. Sampling does not
+start simulation. Use **Save to library…** to retain the sample, or the existing
+simulation button to run it. Sampling again allows you to choose a new seed;
+unsaved edits still require the existing discard confirmation.
+
+The adapter in [scenic_adapter.py](src/robo_sim_py/scenarios/scenic_adapter.py)
+loads and samples Scenic through its Python API, validates the concrete
+parameters, and constructs the same `ScenarioPreset` used elsewhere. There is
+no intermediate JSON requirement. Its imports are lazy, so existing workflows
+continue to work without Scenic installed. The `.scenic` file supplies parameters
+rather than Scenic physical objects; ground/walls are built by the existing
+MuJoCo pipeline. No new obstacle generation or simulation behaviors are added.

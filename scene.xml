@@ -1,0 +1,48 @@
+<mujoco model="MuJoCo Model">
+  <compiler angle="radian"/>
+
+  <visual>
+    <headlight ambient="0.4 0.4 0.4" diffuse="0.7 0.7 0.7" specular="0.1 0.1 0.1"/>
+  </visual>
+
+  <default>
+    <default class="line_tracker_environment"/>
+  </default>
+
+  <asset>
+    <texture type="skybox" colorspace="auto" name="environment_sky" builtin="gradient" rgb1="0.65 0.77 0.88" rgb2="0.92 0.95 0.98" width="256" height="1536"/>
+  </asset>
+
+  <worldbody>
+    <geom name="environment_ground" class="line_tracker_environment" size="0 0 0.1" pos="0 0 -0.05" type="plane" rgba="0.57 0.65 0.68 1"/>
+    <geom name="track_floor_0" class="line_tracker_environment" size="1.04829 0.538188 0.025" pos="1.04829 0 -0.025" type="box" rgba="0.9 0.9 0.9 1"/>
+    <geom name="track_line_0" class="line_tracker_environment" size="1.04829 0.0125 0.0005" pos="1.04829 0 0.0005" type="box" contype="0" conaffinity="0" rgba="0.015 0.015 0.015 1"/>
+    <geom name="track_floor_1" class="line_tracker_environment" size="1.82127 0.538188 0.025" pos="3.51396 -1.14371 -0.025" quat="0.942931 0 0 -0.332989" type="box" rgba="0.9 0.9 0.9 1"/>
+    <geom name="track_line_1" class="line_tracker_environment" size="1.82127 0.0125 0.0005" pos="3.51396 -1.14371 0.0005" quat="0.942931 0 0 -0.332989" type="box" contype="0" conaffinity="0" rgba="0.015 0.015 0.015 1"/>
+    <geom name="track_floor_2" class="line_tracker_environment" size="1.09413 0.538188 0.025" pos="5.86679 -2.85491 -0.025" quat="0.963061 0 0 -0.269285" type="box" rgba="0.9 0.9 0.9 1"/>
+    <geom name="track_line_2" class="line_tracker_environment" size="1.09413 0.0125 0.0005" pos="5.86679 -2.85491 0.0005" quat="0.963061 0 0 -0.269285" type="box" contype="0" conaffinity="0" rgba="0.015 0.015 0.015 1"/>
+    <geom name="track_floor_join_0" class="line_tracker_environment" size="0.538188 0.025" pos="0 0 -0.025" type="cylinder" rgba="0.9 0.9 0.9 1"/>
+    <geom name="track_line_join_0" class="line_tracker_environment" size="0.0125 0.0005" pos="0 0 0.0005" type="cylinder" contype="0" conaffinity="0" rgba="0.015 0.015 0.015 1"/>
+    <geom name="track_floor_join_1" class="line_tracker_environment" size="0.538188 0.025" pos="2.09657 0 -0.025" type="cylinder" rgba="0.9 0.9 0.9 1"/>
+    <geom name="track_line_join_1" class="line_tracker_environment" size="0.0125 0.0005" pos="2.09657 0 0.0005" type="cylinder" contype="0" conaffinity="0" rgba="0.015 0.015 0.015 1"/>
+    <geom name="track_floor_join_2" class="line_tracker_environment" size="0.538188 0.025" pos="4.93134 -2.28741 -0.025" type="cylinder" rgba="0.9 0.9 0.9 1"/>
+    <geom name="track_line_join_2" class="line_tracker_environment" size="0.0125 0.0005" pos="4.93134 -2.28741 0.0005" type="cylinder" contype="0" conaffinity="0" rgba="0.015 0.015 0.015 1"/>
+    <geom name="track_floor_join_3" class="line_tracker_environment" size="0.538188 0.025" pos="6.80224 -3.42241 -0.025" type="cylinder" rgba="0.9 0.9 0.9 1"/>
+    <geom name="track_line_join_3" class="line_tracker_environment" size="0.0125 0.0005" pos="6.80224 -3.42241 0.0005" type="cylinder" contype="0" conaffinity="0" rgba="0.015 0.015 0.015 1"/>
+    <geom name="corridor_wall_0_0" class="line_tracker_environment" size="0.0285745 0.01 0.15" pos="2.12312 0.5469 0.15" quat="0.999706 0 0 -0.0242456" type="box" rgba="0.76 0.81 0.83 1"/>
+    <geom name="corridor_wall_1_0" class="line_tracker_environment" size="0.0285745 0.01 0.15" pos="2.17595 0.541759 0.15" quat="0.997355 0 0 -0.0726797" type="box" rgba="0.76 0.81 0.83 1"/>
+    <geom name="corridor_wall_2_0" class="line_tracker_environment" size="0.0285745 0.01 0.15" pos="2.22804 0.531526 0.15" quat="0.992659 0 0 -0.120943" type="box" rgba="0.76 0.81 0.83 1"/>
+    <geom name="corridor_wall_3_0" class="line_tracker_environment" size="0.0285745 0.01 0.15" pos="2.2789 0.516296 0.15" quat="0.985629 0 0 -0.168922" type="box" rgba="0.76 0.81 0.83 1"/>
+    <geom name="corridor_wall_4_0" class="line_tracker_environment" size="0.0285745 0.01 0.15" pos="2.32804 0.496213 0.15" quat="0.976282 0 0 -0.216503" type="box" rgba="0.76 0.81 0.83 1"/>
+    <geom name="corridor_wall_5_0" class="line_tracker_environment" size="0.0285745 0.01 0.15" pos="2.37501 0.471465 0.15" quat="0.964639 0 0 -0.263576" type="box" rgba="0.76 0.81 0.83 1"/>
+    <geom name="corridor_wall_6_0" class="line_tracker_environment" size="0.0285745 0.01 0.15" pos="2.41935 0.442286 0.15" quat="0.950727 0 0 -0.310029" type="box" rgba="0.76 0.81 0.83 1"/>
+    <geom name="corridor_wall_7_0" class="line_tracker_environment" size="1.80493 0.01 0.15" pos="3.84393 -0.705568 0.15" quat="0.942931 0 0 -0.332989" type="box" rgba="0.76 0.81 0.83 1"/>
+    <geom name="corridor_wall_8_0" class="line_tracker_environment" size="1.07779 0.01 0.15" pos="6.1668 -2.39574 0.15" quat="0.963061 0 0 -0.269285" type="box" rgba="0.76 0.81 0.83 1"/>
+    <geom name="corridor_wall_9_0" class="line_tracker_environment" size="1.09613 0.01 0.15" pos="5.58246 -3.3236 0.15" quat="0.269285 0 0 0.963061" type="box" rgba="0.76 0.81 0.83 1"/>
+    <geom name="corridor_wall_10_0" class="line_tracker_environment" size="0.0386031 0.01 0.15" pos="4.61705 -2.73507 0.15" quat="0.301305 0 0 0.953528" type="box" rgba="0.76 0.81 0.83 1"/>
+    <geom name="corridor_wall_11_0" class="line_tracker_environment" size="1.72648 0.01 0.15" pos="3.24504 -1.63111 0.15" quat="0.332989 0 0 0.942931" type="box" rgba="0.76 0.81 0.83 1"/>
+    <geom name="corridor_wall_12_0" class="line_tracker_environment" size="0.953492 0.01 0.15" pos="0.951492 -0.548188 0.15" quat="0 0 0 1" type="box" rgba="0.76 0.81 0.83 1"/>
+    <geom name="corridor_wall_13_0" class="line_tracker_environment" size="1.05029 0.01 0.15" pos="1.04829 0.548188 0.15" type="box" rgba="0.76 0.81 0.83 1"/>
+    <light pos="3.40112 -1.71121 5" ambient="0.15 0.15 0.15" diffuse="0.6 0.6 0.6"/>
+  </worldbody>
+</mujoco>
