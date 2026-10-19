@@ -1,6 +1,43 @@
-# Line tracker simulation
+# Randomized Testing and Runtime Monitoring for Robotic Navigation Systems
 
-A Python package with a PySide6 desktop editor for MuJoCo robot experiments: generated circuits, imported scenes, and A2-style ZIP packages containing robots and Python controllers.
+A simulation-based testing project for robotic navigation systems, built with Python and MuJoCo. The goal is to generate varied, reproducible environments, execute robot controllers, and evaluate safety and behavioral requirements during execution. A command-line interface and a PySide6 desktop editor share the same scenario and simulation APIs.
+
+## Project scope and current status
+
+The project is organized around three responsibilities:
+
+1. **Scenario generation:** describe and sample navigation environments, then construct their physical geometry.
+2. **Simulation and controller execution:** run robots and other agents in those environments using MuJoCo.
+3. **Runtime monitoring:** observe execution and evaluate multiple safety and behavioral requirements.
+
+The current implementation provides the scenario-generation and simulation foundation:
+
+- A staged environment builder: ground, walls, and lighting, with extension points for future obstacle stages.
+- Flat, wavy, and seeded random-bump terrain; configurable connected corridors and closed loops.
+- Optional Scenic integration that samples flat-ground corridor counts, a shared width, section lengths, and relative turns.
+- Environment-only scene XML export without launching the GUI or simulation, plus editable JSON presets for replay.
+- CLI and GUI workflows for generating, previewing, saving, and running scenarios.
+- Bundled robot examples, custom robot models, complete scene imports, and packaged experiments with Python controllers.
+
+**Multi-property runtime monitoring remains planned work.** The intended monitors will check requirements such as collision avoidance, minimum obstacle clearance, speed limits, goal-reaching deadlines, and lack of progress. The application does not yet provide a general specification-monitoring engine, automated verdict reports, or an end-to-end batch testing campaign.
+
+Maze generation and static/dynamic obstacle generation are also planned extensions. The existing line-following robots are baseline examples for exercising the environment and controller interfaces; line tracking is one supported experiment, rather than the overall project objective.
+
+The intended testing workflow is:
+
+```text
+Scenario specification and seed
+          ↓
+Sampled environment configuration
+          ↓
+Ground → walls → future obstacle stages
+          ↓
+MuJoCo simulation + robot controller
+          ↓
+Planned runtime monitors → requirement verdicts and test reports
+```
+
+Generation and simulation are independent operations. An exported environment-only `scene.xml` contains physical geometry; navigation decisions require a controller. See [the research proposal](ReadME.txt) for the broader monitoring and testing objectives.
 
 ## Project organization
 
@@ -9,9 +46,9 @@ Application code is grouped by responsibility under [src/robo_sim_py/](src/robo_
 | Area | What belongs here |
 | --- | --- |
 | [ui/](src/robo_sim_py/ui/) | [editor.py](src/robo_sim_py/ui/editor.py) contains the PySide6 window and process controls; [preview.py](src/robo_sim_py/ui/preview.py) draws the track preview. |
-| [scenarios/](src/robo_sim_py/scenarios/) | [__init__.py](src/robo_sim_py/scenarios/__init__.py) defines corridor and loop geometry; [library.py](src/robo_sim_py/scenarios/library.py) loads/saves scenarios; [presets/](src/robo_sim_py/scenarios/presets/) holds the six built-in JSON configurations. |
-| [simulation/](src/robo_sim_py/simulation/) | [__init__.py](src/robo_sim_py/simulation/__init__.py) builds and runs MuJoCo models; [walls.py](src/robo_sim_py/simulation/walls.py) calculates wall geometry; [__main__.py](src/robo_sim_py/simulation/__main__.py) is the separate viewer process entry point. |
-| [assets/](src/robo_sim_py/assets/) | [__init__.py](src/robo_sim_py/assets/__init__.py) registers robot examples; [tracking.py](src/robo_sim_py/assets/tracking.py) provides shared driving logic. Each robot folder keeps its controller, XML, and supporting assets together. |
+| [scenarios/](src/robo_sim_py/scenarios/) | [__init__.py](src/robo_sim_py/scenarios/__init__.py) defines corridor and loop geometry; [scenic_adapter.py](src/robo_sim_py/scenarios/scenic_adapter.py) samples Scenic specifications; [library.py](src/robo_sim_py/scenarios/library.py) loads/saves scenarios; [presets/](src/robo_sim_py/scenarios/presets/) holds the six built-in JSON configurations. |
+| [simulation/](src/robo_sim_py/simulation/) | [__init__.py](src/robo_sim_py/simulation/__init__.py) builds and runs MuJoCo models; [generation.py](src/robo_sim_py/simulation/generation.py) implements the staged environment pipeline; [terrain.py](src/robo_sim_py/simulation/terrain.py) builds terrain; [walls.py](src/robo_sim_py/simulation/walls.py) calculates wall geometry; [__main__.py](src/robo_sim_py/simulation/__main__.py) is the separate viewer process entry point. |
+| [assets/](src/robo_sim_py/assets/) | [__init__.py](src/robo_sim_py/assets/__init__.py) registers robot examples; [tracking.py](src/robo_sim_py/assets/tracking.py) provides the shared baseline line-following controller. Each robot folder keeps its controller, XML, and supporting assets together. |
 | [experiments/](src/robo_sim_py/experiments/) | Validates ZIP packages and manifests; defines the controller context, lifecycle and robot placement. |
 | [tests/](tests/) | Geometry, driving, UI, persistence, and worker-process regression tests. |
 
@@ -23,14 +60,14 @@ The public imports `from robo_sim_py import Corridor, Scenario, LoopScenario` an
 
 ## Install and run
 
-Requires Python 3.10 or newer and a desktop with OpenGL support.
+Requires Python 3.10 or newer. GUI previews and interactive simulation need a desktop with OpenGL support; scene generation and validation can run without opening a viewer.
 
 ```bash
 python -m pip install "git+https://github.com/Ahmet-Hamza-Cakmak/CMPE492-Senior-Project.git"
 robo-sim-py
 ```
 
-The GitHub command works once these changes are pushed to the repository's default branch. For a local checkout:
+For a local checkout:
 
 ```bash
 python -m venv .venv
@@ -39,7 +76,7 @@ python -m pip install .
 python -m robo_sim_py
 ```
 
-On Windows activate with `.venv\Scripts\activate`. PySide6 (Qt) is installed by pip; Tkinter is no longer required. On macOS start the editor with normal Python; it launches the MuJoCo worker using `mjpython` automatically. Linux desktop Qt requires the usual system graphics libraries; if Qt reports a missing `xcb-cursor` dependency on Ubuntu/Debian, install `libxcb-cursor0`.
+On Windows activate with `.venv\Scripts\activate`. PySide6 (Qt) is installed by pip. On macOS start the editor with normal Python; it launches the MuJoCo worker using `mjpython` automatically. Linux desktop Qt requires the usual system graphics libraries; if Qt reports a missing `xcb-cursor` dependency on Ubuntu/Debian, install `libxcb-cursor0`.
 
 ## Command-line interface
 
@@ -133,7 +170,7 @@ The top selector offers built-in experiments, **Assignment / full experiment ZIP
 
 See [the experiment guide](docs/experiments.md) for the ZIP layout, `experiment.json`, controller API, Menagerie dependencies and extension registries. Runnable source examples are in [examples/](examples/); run `python examples/make_packages.py` to create both demo ZIPs, then browse to one in its matching mode.
 
-## Create a scenario
+## Create a navigation scenario
 
 1. Choose **Simple two-wheel robot** or **Google Robot (mobile adaptation)**, or browse for a custom MJCF XML.
 2. Choose a scenario category: **Corridor tracks** contains Straight line, Left turn, Right turn, and Zigzag; **Loop tracks** contains Circle circuit and Figure-eight circuit. Saved scenarios appear in their matching category.
@@ -202,7 +239,7 @@ Loop JSON uses version 2:
 
 Use `"shape": "figure_eight"` with `"radius": 3.0` for the infinity-shaped example (the radius field acts as its overall scale). Import and Save to library support both types and retain their category. In Python, use `LoopScenario("circle", radius=2.0)` or `LoopScenario("figure_eight", radius=3.0)`. The controller exposes a `laps` count, which resets with the simulation.
 
-## Robot files
+## Robot models and baseline controllers
 
 Select a complete MJCF model with a `<mujoco>` root. Keep any included XML, meshes, and textures at the paths referenced by that model; the loader reads from its original directory using MuJoCo's [model editing API](https://mujoco.readthedocs.io/en/stable/python.html#model-editing). There is no need to select each asset separately. Missing assets or invalid models are reported in the form. Source model files are never modified.
 
@@ -248,7 +285,7 @@ run(model, scenario, auto_follow=True, robot_path=robot_path)
 
 Run headless tests after installation with `python -m unittest discover -s tests`. These check geometry, validation, model loading, actual driving through turns, endpoint braking, and controller reset; the Qt editor tests use offscreen rendering, while interactive MuJoCo requires a desktop display.
 
-The broader research proposal remains in [ReadME.txt](ReadME.txt).
+The broader research proposal, including planned runtime monitoring, is in [ReadME.txt](ReadME.txt).
 
 ## Adjustable height-field terrain
 
