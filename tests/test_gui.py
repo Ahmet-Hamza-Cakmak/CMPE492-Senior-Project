@@ -55,6 +55,22 @@ class EditorTests(unittest.TestCase):
         warning.assert_called_once()
         self.assertEqual(self.window.scenario(), original)
 
+    def test_astar_and_playback_options_reach_worker(self):
+        self.window.category_choice.setCurrentIndex(self.window.category_choice.findData('dungeons'))
+        self.window.navigation_choice.setCurrentIndex(self.window.navigation_choice.findData('astar'))
+        self.window.grid_resolution.setValue(.2)
+        self.window.navigation_clearance.setValue(.35)
+        self.window.simulation_speed.setValue(5)
+        with patch.object(self.window.process, 'start') as start:
+            self.window.launch()
+            start.assert_called_once()
+        arguments=self.window.process.arguments()
+        self.assertEqual(arguments[arguments.index('--navigation')+1],'astar')
+        self.assertEqual(arguments[arguments.index('--simulation-speed')+1],'5.0')
+        self.assertEqual(arguments[arguments.index('--grid-resolution')+1],'0.2')
+        self.assertEqual(arguments[arguments.index('--navigation-clearance')+1],'0.35')
+        self.assertEqual(json.loads(self.window.pending_scenario)['type'],'dungeon')
+
     def test_assignment_zip_without_manifest_launches_as_script(self):
         from zipfile import ZipFile
         archive_path = Path(self.directory.name) / "whatever.zip"

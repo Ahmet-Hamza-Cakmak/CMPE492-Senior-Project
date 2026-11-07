@@ -1,0 +1,11 @@
+include LICENSE THIRD_PARTY_NOTICES.md README.md pyproject.toml
+recursive-include src *.py *.xml *.stl *.obj *.png *.json *.scenic *.md LICENSE
+recursive-include tests *.py
+recursive-include docs *.md
+recursive-include scripts *.py
+recursive-include examples *.py *.json *.xml
+prune report
+prune .venv
+prune .venv~
+prune build
+prune dist

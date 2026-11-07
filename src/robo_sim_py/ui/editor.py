@@ -19,7 +19,7 @@ from ..experiments import open_package
 from ..scenarios.library import (BUNDLED_DIRECTORY, ScenarioPreset, discover_presets,
                       load_preset, save_preset, user_scenario_directory)
 from .preview import TrackPreview
-from ..scenarios import Corridor, Scenario, LoopScenario, Terrain, CIRCUITS
+from ..scenarios import Corridor, Scenario, LoopScenario, Terrain, CIRCUITS, DungeonScenario, MazeScenario
 
 
 STYLE = """
@@ -69,7 +69,7 @@ class ScenarioWindow(QMainWindow):
         self.loop_shape = "circle"
         self.last_run_directory = None
         self.last_error_output = ""
-        self.setWindowTitle("Line tracker · Scenario studio")
+        self.setWindowTitle("NavProbe · Scenario studio")
         self.resize(1120, 820)
         self.setMinimumSize(930, 700)
         self.setStyleSheet(STYLE)
@@ -160,7 +160,33 @@ class ScenarioWindow(QMainWindow):
         robot_layout.addLayout(robot_row)
         self.auto_follow = QCheckBox("Automatically follow the line")
         self.auto_follow.setChecked(True)
+        self.auto_follow.setText("Automatically drive robot")
         robot_layout.addWidget(self.auto_follow)
+        navigation_form = QFormLayout()
+        self.navigation_choice = QComboBox()
+        for label, value in (("Automatic (A* on supported flat maps)", "auto"),
+                             ("Follow reference line", "line"), ("Grid A* (simple robot, flat ground)", "astar")):
+            self.navigation_choice.addItem(label, value)
+        self.grid_resolution = QDoubleSpinBox()
+        self.grid_resolution.setRange(.05, 2)
+        self.grid_resolution.setSingleStep(.05)
+        self.grid_resolution.setValue(.25)
+        self.grid_resolution.setSuffix(" m")
+        self.navigation_clearance = QDoubleSpinBox()
+        self.navigation_clearance.setRange(0, 2)
+        self.navigation_clearance.setSingleStep(.05)
+        self.navigation_clearance.setSpecialValueText("Auto (at least 0.3 m)")
+        self.navigation_clearance.setValue(0)
+        self.simulation_speed = QDoubleSpinBox()
+        self.simulation_speed.setRange(.1, 20)
+        self.simulation_speed.setSingleStep(1)
+        self.simulation_speed.setValue(1)
+        self.simulation_speed.setSuffix(" ×")
+        navigation_form.addRow("Controller", self.navigation_choice)
+        navigation_form.addRow("A* grid spacing", self.grid_resolution)
+        navigation_form.addRow("Navigation clearance", self.navigation_clearance)
+        navigation_form.addRow("Simulation playback", self.simulation_speed)
+        robot_layout.addLayout(navigation_form)
         self.robot_note = QLabel("Ideal geometric tracking · bundled robot controller")
         self.robot_note.setObjectName("muted")
         self.robot_note.setWordWrap(True)
@@ -172,6 +198,8 @@ class ScenarioWindow(QMainWindow):
         self.category_choice = QComboBox()
         self.category_choice.addItem("Corridor tracks", "corridors")
         self.category_choice.addItem("Loop tracks", "loops")
+        self.category_choice.addItem("BSP dungeons", "dungeons")
+        self.category_choice.addItem("Grid mazes", "mazes")
         scenario_layout.addWidget(self.category_choice)
         self.preset_choice = QComboBox()
         scenario_layout.addWidget(self.preset_choice)
@@ -202,6 +230,80 @@ class ScenarioWindow(QMainWindow):
         form.addRow("Track width (m)", self.width)
         form.addRow("Line width (m)", self.line_width)
         scenario_layout.addLayout(form)
+        self.dungeon_panel = QFrame()
+        dungeon_form = QFormLayout(self.dungeon_panel)
+        self.dungeon_fields = {}
+        for key, label, default in (
+            ("map_width", "Ground width (m)", "200"),
+            ("map_height", "Ground height (m)", "200"),
+            ("room_count", "Rooms (2–64)", "6"),
+            ("room_min", "Min. side / diameter (m)", "8"),
+            ("room_max", "Max. side / diameter (m)", "16"),
+            ("layout_seed", "Layout seed", "42"),
+        ):
+            field = QLineEdit(default)
+            field.textChanged.connect(self._edited)
+            self.dungeon_fields[key] = field
+            dungeon_form.addRow(label, field)
+        self.dungeon_shape = QComboBox()
+        self.dungeon_shape.addItem("Rectangular", "rectangular")
+        self.dungeon_shape.addItem("Circular", "circular")
+        self.dungeon_shape.currentIndexChanged.connect(self._edited)
+        dungeon_form.addRow("Room shape", self.dungeon_shape)
+        dungeon_note = QLabel("Flat ground only. Width above controls passages. The line is a known start-to-goal route; it does not solve or explore the dungeon.")
+        dungeon_note.setWordWrap(True)
+        dungeon_form.addRow(dungeon_note)
+        scenario_layout.addWidget(self.dungeon_panel)
+        self.object_panel = QFrame()
+        object_form = QFormLayout(self.object_panel)
+        self.object_fields = {}
+        for key, label, default in (
+            ("count", "Static boxes (0–30)", "0"),
+            ("seed", "Object seed (Scenic)", "42"),
+            ("min_size", "Min. box side (m)", "0.25"),
+            ("max_size", "Max. box side (m)", "0.6"),
+            ("height", "Box height (m)", "0.4"),
+            ("clearance", "Wall / box clearance (m)", "0.1"),
+            ("robot_radius", "Robot clearance radius (m)", "0.3"),
+        ):
+            field = QLineEdit(default)
+            field.editingFinished.connect(self._edited)
+            self.object_fields[key] = field
+            object_form.addRow(label, field)
+        self.object_placement = QComboBox()
+        self.object_placement.addItem("Navigation challenge (route may be blocked)", "navigation")
+        self.object_placement.addItem("Keep baseline route clear", "clear-route")
+        self.object_placement.currentIndexChanged.connect(self._edited)
+        object_form.addRow("Object placement", self.object_placement)
+        object_note = QLabel("Static boxes use Scenic on every layout. Navigation mode targets the route while preserving access to mission anchors; clear-route protects the baseline. Enlarge narrow tracks if boxes cannot fit. Flat populated tracks use A* with the simple robot; line following does not avoid boxes. Finish editing to update; 0 disables objects.")
+        object_note.setWordWrap(True)
+        object_form.addRow(object_note)
+        scenario_layout.addWidget(self.object_panel)
+        self.maze_panel = QFrame()
+        maze_form = QFormLayout(self.maze_panel)
+        self.maze_algorithm = QComboBox()
+        from ..scenarios.maze import ALGORITHMS
+        for key, label in ALGORITHMS.items():
+            self.maze_algorithm.addItem(label, key)
+        maze_form.addRow("Maze algorithm", self.maze_algorithm)
+        self.maze_fields = {}
+        for key, label, default in (
+            ("rows", "Rows (2–40)", "8"),
+            ("columns", "Columns (2–40)", "8"),
+            ("cell_size", "Cell-centre spacing (m)", "3"),
+            ("layout_seed", "Layout seed", "42"),
+            ("newest_probability", "Newest-cell probability (0–1)", "0.5"),
+            ("loop_fraction", "Extra-connection fraction (0–1)", "0"),
+        ):
+            field = QLineEdit(default)
+            field.editingFinished.connect(self._edited)
+            self.maze_fields[key] = field
+            maze_form.addRow(label, field)
+        self.maze_algorithm.currentIndexChanged.connect(self._maze_algorithm_changed)
+        maze_note = QLabel("Flat ground. Track width controls usable passages; cell spacing must exceed it by at least 0.1 m. Zero extra connections gives a perfect maze. Newest probability affects Growing Tree only: 1 matches DFS, 0 selects random active cells. Start is cell (0,0); goal is a farthest cell by graph distance.")
+        maze_note.setWordWrap(True)
+        maze_form.addRow(maze_note)
+        scenario_layout.addWidget(self.maze_panel)
         self.table = QTableWidget(0, 2)
         self.table.setHorizontalHeaderLabels(["Length (m)", "Turn (°)"])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
@@ -375,7 +477,7 @@ class ScenarioWindow(QMainWindow):
         self.preset_choice.clear()
         selected_index = 0
         for preset, label in self.catalog:
-            if ("loops" if preset.scenario.closed else "corridors") == category:
+            if ("mazes" if isinstance(preset.scenario, MazeScenario) else "dungeons" if isinstance(preset.scenario, DungeonScenario) else "loops" if preset.scenario.closed else "corridors") == category:
                 self.preset_choice.addItem(f"{preset.name} · {label}", preset)
                 if preset is selected:
                     selected_index = self.preset_choice.count() - 1
@@ -385,7 +487,7 @@ class ScenarioWindow(QMainWindow):
         if self.current_preset_index >= 0:
             self.apply_preset(self.preset_choice.currentData())
         else:
-            scenario = LoopScenario() if category == "loops" else Scenario((Corridor(2),))
+            scenario = MazeScenario() if category == "mazes" else DungeonScenario() if category == "dungeons" else LoopScenario() if category == "loops" else Scenario((Corridor(2),))
             self.apply_preset(ScenarioPreset("Custom track", "", scenario))
 
     def _preset_selected(self, index):
@@ -409,15 +511,33 @@ class ScenarioWindow(QMainWindow):
         self.terrain_resolution.setValue(terrain.resolution)
         self.terrain_seed.setValue(terrain.seed)
         self._terrain_changed()
+        maze = isinstance(preset.scenario, MazeScenario)
+        dungeon = isinstance(preset.scenario, DungeonScenario)
+        self.maze_panel.setVisible(maze)
+        self.dungeon_panel.setVisible(dungeon)
+        self.terrain_card.setEnabled(not (dungeon or maze))
         closed = preset.scenario.closed
-        self.parameters_form.setRowVisible(self.count, not closed)
+        self.parameters_form.setRowVisible(self.count, not closed and not dungeon and not maze)
         self.parameters_form.setRowVisible(self.radius, closed)
-        self.table.setVisible(not closed)
-        self.angles.setVisible(not closed)
+        self.table.setVisible(not closed and not dungeon and not maze)
+        self.angles.setVisible(not closed and not dungeon and not maze)
         self.loop_note.setVisible(closed)
+        self._loaded_scenario = preset.scenario
+        self.object_placement.setCurrentIndex(self.object_placement.findData(preset.scenario.objects.placement))
+        for key, field in self.object_fields.items():
+            field.setText(str(getattr(preset.scenario.objects, key)))
         self.width.setText(str(preset.scenario.width))
         self.line_width.setText(str(preset.scenario.line_width))
-        if closed:
+        if maze:
+            for key, field in self.maze_fields.items():
+                field.setText(str(getattr(preset.scenario, key)))
+            self.maze_algorithm.setCurrentIndex(self.maze_algorithm.findData(preset.scenario.algorithm))
+            self.maze_fields["newest_probability"].setEnabled(preset.scenario.algorithm == "growing-tree")
+        elif dungeon:
+            for key, field in self.dungeon_fields.items():
+                field.setText(str(getattr(preset.scenario, key)))
+            self.dungeon_shape.setCurrentIndex(self.dungeon_shape.findData(preset.scenario.room_shape))
+        elif closed:
             self.loop_shape = preset.scenario.shape
             self.parameters_form.labelForField(self.radius).setText(
                 CIRCUITS[self.loop_shape].size_label)
@@ -449,6 +569,10 @@ class ScenarioWindow(QMainWindow):
         self.loading = False
         self._edited()
 
+    def _maze_algorithm_changed(self, *_):
+        self.maze_fields["newest_probability"].setEnabled(self.maze_algorithm.currentData() == "growing-tree")
+        self._edited()
+
     def _terrain_changed(self, *_):
         mode = self.terrain_mode.currentData()
         for widget in (self.terrain_height, self.terrain_spacing, self.terrain_resolution):
@@ -457,8 +581,41 @@ class ScenarioWindow(QMainWindow):
         self._edited()
 
     def scenario(self):
+        from dataclasses import replace
+        from ..scenarios.objects import StaticObjectSettings
+        from ..scenarios.population import populate_scenario
+        base = self._base_scenario()
+        try:
+            settings = StaticObjectSettings(placement=self.object_placement.currentData(), **{
+                key: int(field.text()) if key in ("count", "seed") else float(field.text())
+                for key, field in self.object_fields.items()})
+        except ValueError as exc:
+            raise ValueError(f"Invalid static object settings: {exc}") from exc
+        candidate = replace(base, objects=settings)
+        loaded = getattr(self, "_loaded_scenario", None)
+        if loaded is not None and replace(loaded, static_objects=None) == candidate:
+            return populate_scenario(loaded)
+        return populate_scenario(candidate)
+
+    def _base_scenario(self):
         terrain = Terrain(self.terrain_mode.currentData(), self.terrain_height.value()/100,
                           self.terrain_spacing.value(), self.terrain_resolution.value(), self.terrain_seed.value())
+        if self.current_category == "mazes":
+            try:
+                values = {key: int(field.text()) if key in ("rows", "columns", "layout_seed") else float(field.text())
+                          for key, field in self.maze_fields.items()}
+                return MazeScenario(**values, algorithm=self.maze_algorithm.currentData(),
+                                    width=float(self.width.text()), line_width=float(self.line_width.text()), terrain=terrain)
+            except ValueError as exc:
+                raise ValueError(f"Invalid maze settings: {exc}") from exc
+        if self.current_category == "dungeons":
+            try:
+                values = {key: (int(field.text()) if key in ("room_count", "layout_seed") else float(field.text()))
+                          for key, field in self.dungeon_fields.items()}
+            except ValueError as exc:
+                raise ValueError("Enter valid dungeon dimensions, integer room count, and integer layout seed.") from exc
+            return DungeonScenario(**values, room_shape=self.dungeon_shape.currentData(),
+                                   width=float(self.width.text()), line_width=float(self.line_width.text()), terrain=terrain)
         if self.current_category == "loops":
             return LoopScenario(self.loop_shape, float(self.radius.text()),
                                 float(self.width.text()), float(self.line_width.text()), terrain)
@@ -509,8 +666,10 @@ class ScenarioWindow(QMainWindow):
             self.save_button.setEnabled(False)
             return
         self.preview.set_scenario(scenario)
-        self.summary.setText(f"Closed loop · {scenario.total_length:.1f} m per lap · repeats" if scenario.closed else
+        self.summary.setText(f"{scenario.algorithm} maze · {scenario.rows}×{scenario.columns} cells · route {scenario.total_length:.1f} m" if isinstance(scenario, MazeScenario) else f"BSP dungeon · {scenario.room_count} {scenario.room_shape} rooms · {scenario.objects.count} boxes · route {scenario.total_length:.1f} m" if isinstance(scenario, DungeonScenario) else f"Closed loop · {scenario.total_length:.1f} m per lap · repeats" if scenario.closed else
                             f"{len(scenario.corridors)} corridors · {scenario.total_length:g} m total")
+        if not isinstance(scenario, DungeonScenario) and scenario.objects.count:
+            self.summary.setText(self.summary.text() + f" · {scenario.objects.count} boxes")
         running = self.process.state() != QProcess.ProcessState.NotRunning
         self.launch_button.setEnabled(True)
         self.launch_button.setText("Restart with selected scenario" if running else "Open MuJoCo simulation")
@@ -555,7 +714,7 @@ class ScenarioWindow(QMainWindow):
 
     def _add_preset(self, preset, origin):
         self.catalog.append((preset, origin))
-        self._fill_presets("loops" if preset.scenario.closed else "corridors", selected=preset)
+        self._fill_presets("mazes" if isinstance(preset.scenario, MazeScenario) else "dungeons" if isinstance(preset.scenario, DungeonScenario) else "loops" if preset.scenario.closed else "corridors", selected=preset)
 
     def save_scenario(self):
         name, accepted = QInputDialog.getText(self, "Save scenario", "Scenario name:")
@@ -613,8 +772,18 @@ class ScenarioWindow(QMainWindow):
                     raise ValueError("Select an existing robot XML file.")
                 pending_scenario = json.dumps(preset.to_dict(), allow_nan=False).encode("utf-8")
                 arguments = ["-m", "robo_sim_py.simulation", "--robot", str(robot_path)]
+                arguments.extend(["--simulation-speed", str(self.simulation_speed.value())])
                 if self.auto_follow.isChecked():
-                    arguments.append("--auto-follow")
+                    from ..assets import controller_mode
+                    mode = controller_mode(robot_path, preset.scenario, self.navigation_choice.currentData())
+                    arguments.extend(["--auto-follow", "--navigation", self.navigation_choice.currentData()])
+                    if mode == "astar":
+                        arguments.extend(["--grid-resolution", str(self.grid_resolution.value())])
+                        clearance = self.navigation_clearance.value()
+                        if clearance:
+                            if clearance < .25:
+                                raise ValueError("A* navigation clearance must be at least 0.25 m.")
+                            arguments.extend(["--navigation-clearance", str(clearance)])
         except (ValueError, OSError) as exc:
             QMessageBox.warning(self, "Cannot start simulation", str(exc))
             return

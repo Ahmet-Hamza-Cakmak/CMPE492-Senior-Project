@@ -45,8 +45,25 @@ def example_for_path(path):
     return next((example for example in EXAMPLES if example.path.resolve() == resolved), None)
 
 
-def create_controller(robot_path, model, scenario):
+def controller_mode(robot_path, scenario, mode="auto"):
+    from ..scenarios import DungeonScenario, MazeScenario
+    example = example_for_path(robot_path)
+    if mode not in ("auto", "line", "astar"):
+        raise ValueError("Controller mode must be auto, line or astar.")
+    supported = (example is not None and example.key == "simple_robot" and scenario.terrain.mode == 'flat')
+    if mode == "auto":
+        needs_planning = isinstance(scenario, (DungeonScenario, MazeScenario)) or scenario.objects.count > 0
+        return "astar" if supported and needs_planning else "line"
+    if mode == "astar" and not supported:
+        raise ValueError("A* requires the simple_robot on a generated flat scenario; use auto or line for other scenarios.")
+    return mode
+
+
+def create_controller(robot_path, model, scenario, *, mode="auto", resolution=.25, clearance=None):
     example = example_for_path(robot_path)
     if example is None:
         raise ValueError("Automatic driving requires a registered example robot.")
+    if controller_mode(robot_path, scenario, mode) == "astar":
+        from .simple_robot.controller import NavigationFollower
+        return NavigationFollower(model, scenario, resolution=resolution, clearance=clearance)
     return example.controller(model, scenario)

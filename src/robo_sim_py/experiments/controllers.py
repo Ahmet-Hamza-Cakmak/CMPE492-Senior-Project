@@ -68,12 +68,14 @@ def place_robot(model, spawn):
 
 class BundledController:
     """Adapt existing robot followers to the same lifecycle as packaged controllers."""
-    def __init__(self, robot_path):
+    def __init__(self, robot_path, *, mode="auto", resolution=.25, clearance=None):
         self.robot_path = robot_path
+        self.mode, self.resolution, self.clearance = mode, resolution, clearance
 
     def reset(self, model, data, context):
         from ..assets import create_controller
-        self.follower = create_controller(self.robot_path, model, context.scenario)
+        self.follower = create_controller(self.robot_path, model, context.scenario,
+                                          mode=self.mode, resolution=self.resolution, clearance=self.clearance)
 
     def step(self, model, data, context):
         self.follower.update(data)

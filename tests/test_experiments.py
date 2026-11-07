@@ -226,7 +226,10 @@ Path('data/result.txt').write_text(helper.VALUE)
         viewer.sync.side_effect = sync
         manager = MagicMock()
         manager.__enter__.return_value = viewer
-        with patch('mujoco.viewer.launch_passive', return_value=manager), patch('time.sleep'):
+        import itertools
+        frame_clock = itertools.count(0, .02)
+        with patch('mujoco.viewer.launch_passive', return_value=manager), patch('time.sleep'), \
+             patch('time.monotonic', side_effect=lambda: next(frame_clock)):
             run(model, controller=controller, context=context)
         self.assertEqual(controller.reset.call_count, 2)
         self.assertEqual(controller.step.call_count, 3)

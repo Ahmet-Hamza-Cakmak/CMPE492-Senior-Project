@@ -1,6 +1,37 @@
+# Python caches and packaging outputs.
 __pycache__/
 *.py[cod]
 *.egg-info/
 build/
 dist/
+
+# Local virtual environments (including this checkout's existing .venv~).
 .venv/
+.venv~/
+venv/
+
+# Test, coverage, and static-analysis outputs.
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Local project report: templates, chapter drafts, UML, rendered diagrams,
+# bibliography intermediates, and LaTeX build outputs.
+/report-v2.*
+/report/
+/diagram/
+/diagrams/
+
+# Environment exports generated in the repository root. Reusable example
+# scenes under examples/ and bundled robot XML under src/ remain versioned.
+/*.xml
+/*_assets/
+
+# Reproducible example archives; keep their source directories and builder.
+/examples/*.zip
+
+# Superseded local project overview; README.md and docs/ are maintained.
+/ReadME.txt

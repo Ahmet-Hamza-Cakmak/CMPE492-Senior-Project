@@ -47,6 +47,19 @@ class HeightField:
         h = self.heights
         return float((1-b)*((1-a)*h[j, i]+a*h[j, i+1]) + b*((1-a)*h[j+1, i]+a*h[j+1, i+1]))
 
+    def support_height(self, footprint):
+        """Conservative local peak for a level fixed box on triangulated terrain.
+
+        Include vertices of all grid cells under the footprint's bounding box.
+        This prevents terrain penetration; a rigid box may bridge lower patches.
+        """
+        x0, y0, x1, y1 = footprint.bounds
+        low = np.clip((np.array([x0,y0])-self.low)/(self.high-self.low),0,1)
+        high = np.clip((np.array([x1,y1])-self.low)/(self.high-self.low),0,1)
+        i0,j0 = np.floor(low*np.array([self.nx-1,self.ny-1])).astype(int)
+        i1,j1 = np.ceil(high*np.array([self.nx-1,self.ny-1])).astype(int)
+        return float(self.heights[j0:j1+1,i0:i1+1].max())
+
     def add_to_spec(self, spec, default):
         import mujoco
 

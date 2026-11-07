@@ -4,6 +4,8 @@ from dataclasses import dataclass
 import math
 from typing import Callable
 
+from .objects import StaticObjectSettings, StaticBox, validate_population
+
 
 @dataclass(frozen=True)
 class Terrain:
@@ -46,6 +48,8 @@ class Scenario:
     width: float = 0.8
     line_width: float = 0.025
     terrain: Terrain = Terrain()
+    objects: StaticObjectSettings = StaticObjectSettings()
+    static_objects: tuple[StaticBox, ...] | None = None
 
     @property
     def closed(self):
@@ -64,6 +68,7 @@ class Scenario:
             raise ValueError("Widths must be finite.")
         if not 0 < self.line_width < self.width:
             raise ValueError("Line width must be positive and smaller than corridor width.")
+        validate_population(self)
 
     def points(self):
         """Shared endpoints ensure consecutive sections have no gaps."""
@@ -119,6 +124,8 @@ class LoopScenario:
     width: float = 0.8
     line_width: float = 0.025
     terrain: Terrain = Terrain()
+    objects: StaticObjectSettings = StaticObjectSettings()
+    static_objects: tuple[StaticBox, ...] | None = None
 
     def __post_init__(self):
         if self.shape not in CIRCUITS:
@@ -129,6 +136,7 @@ class LoopScenario:
             raise ValueError("Line width must be positive and smaller than track width.")
         if not 2 * self.width <= self.radius <= 1000:
             raise ValueError("Loop radius/scale must be at least twice its width and at most 1000 m.")
+        validate_population(self)
 
     @property
     def closed(self):
@@ -155,3 +163,8 @@ class LoopScenario:
     def total_length(self):
         points = self.points()
         return sum(math.dist(a, b) for a, b in zip(points, points[1:]))
+
+
+from .dungeon import DungeonScenario
+
+from .maze import MazeScenario

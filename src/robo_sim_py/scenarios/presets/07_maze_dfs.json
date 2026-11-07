@@ -1,0 +1,22 @@
+{
+  "version": 4,
+  "type": "maze",
+  "name": "DFS maze",
+  "description": "Flat seeded grid maze; choose a new layout seed for variation.",
+  "rows": 8,
+  "columns": 8,
+  "cell_size": 3.0,
+  "width": 2.0,
+  "algorithm": "dfs",
+  "newest_probability": 0.5,
+  "loop_fraction": 0.0,
+  "layout_seed": 42,
+  "line_width": 0.025,
+  "terrain": {
+    "mode": "flat",
+    "height": 0.003,
+    "spacing": 0.8,
+    "resolution": 129,
+    "seed": 42
+  }
+}

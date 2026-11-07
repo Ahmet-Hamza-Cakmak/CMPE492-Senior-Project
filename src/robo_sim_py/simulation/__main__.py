@@ -19,6 +19,10 @@ def main():
     parser.add_argument("--menagerie")
     parser.add_argument("--run-directory")
     parser.add_argument("--auto-follow", action="store_true")
+    parser.add_argument("--navigation", choices=("auto", "line", "astar"), default="auto")
+    parser.add_argument("--grid-resolution", type=float, default=.25)
+    parser.add_argument("--navigation-clearance", type=float)
+    parser.add_argument("--simulation-speed", type=float, default=1.)
     args = parser.parse_args()
     def stop_worker(signum, frame):
         raise SystemExit(0)
@@ -37,6 +41,8 @@ def main():
                 if experiment.menagerie and not args.menagerie:
                     raise ValueError("This experiment needs a local mujoco_menagerie directory.")
                 if experiment.mode == "standalone":
+                    if args.simulation_speed != 1:
+                        raise ValueError("Standalone assignments own their simulation pacing.")
                     from ..experiments import run_assignment
                     from ..scenarios.library import user_scenario_directory
                     import uuid
@@ -48,17 +54,19 @@ def main():
                 if scenario:
                     place_robot(model, experiment.spawn)
                 controller, context = load_controller(experiment, scenario)
-                run(model, scenario, controller=controller, context=context)
+                run(model, scenario, controller=controller, context=context, simulation_speed=args.simulation_speed)
             return 0
         if args.scene:
             if args.auto_follow:
                 raise ValueError("Automatic line following is unavailable for imported scenes.")
-            run(load_scene(args.scene))
+            run(load_scene(args.scene), simulation_speed=args.simulation_speed)
             return 0
         payload = json.load(sys.stdin)
         scenario = parse_preset(payload).scenario
         model = build_model(args.robot, scenario)
-        run(model, scenario, auto_follow=args.auto_follow, robot_path=args.robot)
+        run(model, scenario, auto_follow=args.auto_follow, robot_path=args.robot,
+            navigation=args.navigation, grid_resolution=args.grid_resolution,
+            navigation_clearance=args.navigation_clearance, simulation_speed=args.simulation_speed)
     except Exception as exc:
         print(f"Cannot run simulation: {exc}", file=sys.stderr)
         return 1

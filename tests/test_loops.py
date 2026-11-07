@@ -49,4 +49,5 @@ class LoopTests(unittest.TestCase):
              patch("robo_sim_py.simulation.__main__.run") as run:
             self.assertEqual(main(), 0)
             build.assert_called_once_with("example.xml", scenario)
-            run.assert_called_once_with(build.return_value, scenario, auto_follow=True, robot_path="example.xml")
+            run.assert_called_once_with(build.return_value, scenario, auto_follow=True, robot_path="example.xml",
+                                        navigation="auto", grid_resolution=.25, navigation_clearance=None, simulation_speed=1.)

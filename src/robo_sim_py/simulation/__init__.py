@@ -43,9 +43,14 @@ def build_model(robot_path, scenario: Scenario, *, pipeline=None):
     return model
 
 
-def run(model, scenario=None, *, auto_follow=False, robot_path=None, controller=None, context=None):
+def run(model, scenario=None, *, auto_follow=False, robot_path=None, controller=None, context=None,
+        navigation="auto", grid_resolution=.25, navigation_clearance=None, simulation_speed=1.0):
     import mujoco
     import mujoco.viewer
+    import math
+
+    if not math.isfinite(simulation_speed) or not .1 <= simulation_speed <= 20:
+        raise ValueError("Simulation speed must be between 0.1 and 20 times real time.")
 
     if auto_follow and scenario is None:
         raise ValueError("Automatic line following requires a generated scenario.")
@@ -56,7 +61,7 @@ def run(model, scenario=None, *, auto_follow=False, robot_path=None, controller=
         if controller is not None:
             raise ValueError("Choose either a packaged controller or the built-in controller.")
         path = Path(robot_path or example_robot())
-        controller = BundledController(path)
+        controller = BundledController(path, mode=navigation, resolution=grid_resolution, clearance=navigation_clearance)
         context = ControllerContext(path.parent, {}, scenario, tuple(scenario.points()), None)
     managed = context is not None and controller is not None
     previous_time = float(data.time)
@@ -65,13 +70,26 @@ def run(model, scenario=None, *, auto_follow=False, robot_path=None, controller=
             controller.reset(model, data, context)
             mujoco.mj_forward(model, data)
         with mujoco.viewer.launch_passive(model, data) as viewer:
+            active_follower = getattr(controller, "follower", controller)
+            planned = getattr(active_follower, "plan", None)
+            if planned is not None:
+                from ..navigation import PlannedRoute, draw_route
+                if isinstance(planned, PlannedRoute):
+                    draw_route(viewer.user_scn, planned)
             if scenario is not None:
-                xs, ys = zip(*scenario.points())
+                from ..scenarios import DungeonScenario, MazeScenario
+                from ..scenarios.dungeon import dungeon_layout
+                if isinstance(scenario, (DungeonScenario, MazeScenario)):
+                    x0,y0,x1,y1 = dungeon_layout(scenario).bounds
+                    xs,ys = (x0,x1),(y0,y1)
+                else:
+                    xs, ys = zip(*scenario.points())
                 viewer.cam.lookat[:] = [(min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2, 0]
                 viewer.cam.distance = max(max(xs) - min(xs), max(ys) - min(ys), scenario.width) * 1.6 + 1
                 viewer.cam.elevation = -80 if scenario.terrain.mode != "flat" else -65
             else:
                 mujoco.mjv_defaultFreeCamera(model, viewer.cam)
+            last_sync = -math.inf
             while viewer.is_running():
                 started = time.monotonic()
                 if controller is not None:
@@ -84,8 +102,12 @@ def run(model, scenario=None, *, auto_follow=False, robot_path=None, controller=
                         controller.update(data)
                 mujoco.mj_step(model, data)
                 previous_time = float(data.time)
-                viewer.sync()
-                time.sleep(max(0, model.opt.timestep - (time.monotonic() - started)))
+                now = time.monotonic()
+                if now - last_sync >= 1/60:
+                    viewer.sync()
+                    last_sync = now
+                # Controller updates and physics retain their original timestep.
+                time.sleep(max(0, model.opt.timestep/simulation_speed - (time.monotonic() - started)))
     finally:
         if managed:
             controller.close()

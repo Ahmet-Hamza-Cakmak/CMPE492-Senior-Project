@@ -54,7 +54,7 @@ def sample_scenic(path=BUNDLED_SCENIC, *, seed=42, max_iterations=2000):
         import scenic
         import numpy as np
     except ImportError as exc:
-        raise ValueError('Scenic support is optional. Install it with: python -m pip install -e ".[scenic]"') from exc
+        raise ValueError('Scenic support is optional. Install it with: python -m pip install "navprobe[scenic]" (or ".[scenic]" from a checkout)') from exc
     with _SAMPLING_LOCK:
         python_state, numpy_state = random.getstate(), np.random.get_state()
         try:

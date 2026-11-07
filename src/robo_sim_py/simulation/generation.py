@@ -8,14 +8,14 @@ from dataclasses import dataclass
 import math
 from typing import Any, Protocol
 
-from ..scenarios import Scenario, LoopScenario
+from ..scenarios import Scenario, LoopScenario, DungeonScenario, MazeScenario
 from .walls import WALL_HEIGHT, WALL_THICKNESS, wall_segments
 
 
 @dataclass
 class GenerationContext:
     spec: Any
-    scenario: Scenario | LoopScenario
+    scenario: Scenario | LoopScenario | DungeonScenario | MazeScenario
     default: Any
     terrain: Any = None
 
@@ -34,6 +34,10 @@ def ground_stage(context):
     import mujoco
 
     spec, scenario, track_default = context.spec, context.scenario, context.default
+    if isinstance(scenario, (DungeonScenario, MazeScenario)):
+        from .dungeon import add_dungeon_ground
+        add_dungeon_ground(context)
+        return
     points = scenario.points()
     terrain = None
     if scenario.terrain.mode != "flat":
@@ -109,6 +113,21 @@ def walls_stage(context):
             )
 
 
+def static_objects_stage(context):
+    """Add fixed collidable population after terrain and walls."""
+    import mujoco
+    from ..scenarios.population import static_objects
+    for index, obj in enumerate(static_objects(context.scenario)):
+        base = context.terrain.support_height(obj.footprint()) if context.terrain is not None else 0.0
+        context.spec.worldbody.add_geom(
+            context.default, name=f"static_box_{index}", type=mujoco.mjtGeom.mjGEOM_BOX,
+            pos=[obj.x, obj.y, base + obj.height/2],
+            size=[obj.width/2, obj.length/2, obj.height/2],
+            quat=[math.cos(obj.yaw/2), 0, 0, math.sin(obj.yaw/2)],
+            rgba=[.64, .36, .16, 1], contype=1, conaffinity=1,
+        )
+
+
 def lighting_stage(context):
     import mujoco
 
@@ -140,7 +159,7 @@ def lighting_stage(context):
 class GenerationPipeline:
     """Ordered stages; append future obstacle stages after ground and walls."""
 
-    stages: tuple[GenerationStage, ...] = (ground_stage, walls_stage, lighting_stage)
+    stages: tuple[GenerationStage, ...] = (ground_stage, walls_stage, static_objects_stage, lighting_stage)
 
     def build(self, spec, scenario):
         import mujoco

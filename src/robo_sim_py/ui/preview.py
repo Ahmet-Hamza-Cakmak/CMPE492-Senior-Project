@@ -30,6 +30,34 @@ class TrackPreview(QWidget):
             painter.setPen(QColor("#617773"))
             painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "Enter valid parameters to preview")
             return
+        from ..scenarios import DungeonScenario, MazeScenario
+        from ..scenarios.dungeon import dungeon_layout
+        if isinstance(self.scenario, (DungeonScenario, MazeScenario)):
+            layout = dungeon_layout(self.scenario)
+            x0,y0,x1,y1 = layout.bounds
+            scale = min((self.width()-50)/(x1-x0), (self.height()-50)/(y1-y0))
+            cx,cy=(x0+x1)/2,(y0+y1)/2
+            def screen(point):
+                return QPointF(self.width()/2+(point[0]-cx)*scale, self.height()/2-(point[1]-cy)*scale)
+            floor = QPainterPath()
+            for ring in (layout.floor.exterior, *layout.floor.interiors):
+                points = list(ring.coords)
+                floor.moveTo(screen(points[0]))
+                for point in points[1:]:
+                    floor.lineTo(screen(point))
+                floor.closeSubpath()
+            painter.setBrush(QColor('white'))
+            painter.setPen(QPen(QColor('#71858a'), max(1, WALL_THICKNESS*scale)))
+            painter.drawPath(floor)
+            painter.setPen(QPen(QColor('#2d4540'), max(1, self.scenario.line_width*scale)))
+            for a,b in zip(layout.route,layout.route[1:]):
+                painter.drawLine(screen(a),screen(b))
+            for point,label,color in ((layout.route[0],'START','#176b56'),(layout.route[-1],'GOAL','#af6434')):
+                painter.setBrush(QColor(color));painter.setPen(QColor(color))
+                painter.drawEllipse(screen(point),4,4)
+                painter.drawText(screen(point)+QPointF(6,-6),label)
+            self._draw_objects(painter, screen)
+            return
         points = self.scenario.points()
         xs, ys = zip(*points)
         scale = min((self.width() - 80) / (max(xs) - min(xs) + self.scenario.width),
@@ -56,6 +84,7 @@ class TrackPreview(QWidget):
         painter.setPen(wall_pen)
         for start, end in wall_segments(self.scenario):
             painter.drawLine(screen(start), screen(end))
+        self._draw_objects(painter, screen)
         markers = ((points[0], "START / LAP", "#176b56"),) if self.scenario.closed else (
             (points[0], "START", "#176b56"), (points[-1], "FINISH", "#af6434"))
         for point, label, color in markers:
@@ -65,3 +94,15 @@ class TrackPreview(QWidget):
             painter.drawEllipse(position, 6, 6)
             painter.setPen(QColor(color))
             painter.drawText(position + QPointF(10, -12), label)
+
+    def _draw_objects(self, painter, screen):
+        from ..scenarios.population import static_objects
+        painter.setBrush(QColor('#a96832'))
+        painter.setPen(QPen(QColor('#714323'), 1))
+        for obj in static_objects(self.scenario):
+            outline = list(obj.footprint().exterior.coords)
+            shape = QPainterPath(screen(outline[0]))
+            for point in outline[1:]:
+                shape.lineTo(screen(point))
+            shape.closeSubpath()
+            painter.drawPath(shape)

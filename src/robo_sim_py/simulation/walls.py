@@ -18,6 +18,13 @@ def wall_segments(scenario):
     The buffer is outside the usable corridor width; curved corners are
     approximated with short straight wall panels.
     """
+    from ..scenarios import DungeonScenario, MazeScenario
+    from ..scenarios.dungeon import dungeon_layout
+    if isinstance(scenario, (DungeonScenario, MazeScenario)):
+        # Offset by half the thickness, so the requested floor remains usable.
+        outline = dungeon_layout(scenario).floor.buffer(WALL_THICKNESS/2, join_style='round', quad_segs=4)
+        return tuple((a,b) for ring in (outline.exterior, *outline.interiors)
+                     for a,b in zip(list(ring.coords), list(ring.coords)[1:]) if math.dist(a,b)>1e-8)
     points = scenario.points()
     radius = (scenario.width + WALL_THICKNESS) / 2
     outline = LineString(points).buffer(radius, cap_style="round", join_style="round", quad_segs=16)
