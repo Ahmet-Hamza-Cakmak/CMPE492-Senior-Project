@@ -11,12 +11,12 @@ a desktop; the editor, schematic preview, and MuJoCo viewer need graphics suppor
 The current local validation environment uses Python 3.14 on Linux; other
 supported versions and platforms still need release testing.
 
-From a local checkout:
+Install the alpha release from PyPI:
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
-python -m pip install .           # CLI, geometry, and MuJoCo
+python -m pip install --pre navprobe  # CLI, geometry, and MuJoCo
 navprobe --help
 navprobe generate --maze --maze-rows 4 --maze-columns 4 --output maze.xml
 ```
@@ -24,23 +24,33 @@ navprobe generate --maze --maze-rows 4 --maze-columns 4 --output maze.xml
 Choose optional dependencies as needed:
 
 ```bash
-python -m pip install ".[gui]"     # editor and schematic preview
-python -m pip install ".[scenic]"  # constrained static-object sampling
-python -m pip install ".[all]"     # both GUI and Scenic
+python -m pip install --pre "navprobe[gui]"     # editor and schematic preview
+python -m pip install --pre "navprobe[scenic]"  # constrained static-object sampling
+python -m pip install --pre "navprobe[all]"     # both GUI and Scenic
 navprobe --gui
 ```
 
-On Windows activate with `.venv\Scripts\activate`. For development, use
-`python -m pip install -e ".[all,dev]"`. After these changes reach GitHub's default
-branch, installation directly from the repository will also be available:
+The current release is `0.1.0a1`; APIs and behaviour may change during alpha
+development. To install that exact release, use
+`python -m pip install "navprobe[all]==0.1.0a1"`. To upgrade to the latest
+available prerelease, use `python -m pip install --upgrade --pre "navprobe[all]"`.
+
+On Windows activate with `.venv\Scripts\activate`.
+
+## Install from source
+
+From a local checkout, use `python -m pip install ".[all]"`. For development,
+use `python -m pip install -e ".[all,dev]"` instead. You can also install directly
+from GitHub (requires Git):
 
 ```bash
 python -m pip install "navprobe[all] @ git+https://github.com/Ahmet-Hamza-Cakmak/CMPE492-Senior-Project.git"
 ```
 
-The project is not published to PyPI by this change. After publication, equivalent
-commands will be `pip install navprobe`, `pip install "navprobe[gui]"`, and
-`pip install "navprobe[all]"`. Confirm name availability before publishing.
+To install a downloaded wheel, use
+`python -m pip install /path/to/navprobe-0.1.0a1-py3-none-any.whl`.
+
+## Commands and platform notes
 
 `python -m navprobe` is equivalent to `navprobe`. Existing `robo-sim-py` commands,
 `python -m robo_sim_py`, and Python imports from `robo_sim_py` remain supported.

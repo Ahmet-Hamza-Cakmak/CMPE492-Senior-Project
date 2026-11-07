@@ -19,12 +19,13 @@ Dynamic obstacles and LoomRV runtime monitoring are planned extensions.
 Requires **Python 3.10+**. Generation and validation work without a desktop;
 the graphical editor, preview, and simulation viewer require graphics support.
 
-From a local checkout:
+Install the current alpha release from [PyPI](https://pypi.org/project/navprobe/)
+in a virtual environment:
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
-python -m pip install ".[all]"
+python -m pip install --pre "navprobe[all]"
 ```
 
 On Windows, activate with `.venv\Scripts\activate` instead.
@@ -32,20 +33,15 @@ Choose the installation that fits your workflow:
 
 | Command | Includes |
 | --- | --- |
-| `pip install .` | CLI, geometry, and MuJoCo |
-| `pip install ".[gui]"` | Base package plus graphical editor and preview |
-| `pip install ".[scenic]"` | Base package plus constrained scenario sampling |
-| `pip install ".[all]"` | Both GUI and Scenic |
+| `pip install --pre navprobe` | CLI, geometry, and MuJoCo |
+| `pip install --pre "navprobe[gui]"` | Base package plus graphical editor and preview |
+| `pip install --pre "navprobe[scenic]"` | Base package plus constrained scenario sampling |
+| `pip install --pre "navprobe[all]"` | Both GUI and Scenic |
 
-To install a built wheel, use `pip install /path/to/navprobe-0.1.0-py3-none-any.whl`.
-GitHub installation will be available once these changes reach the default branch:
-
-```bash
-python -m pip install "navprobe[all] @ git+https://github.com/Ahmet-Hamza-Cakmak/CMPE492-Senior-Project.git"
-```
-
-**The package has not been published to PyPI.** See the
-[installation guide](docs/installation.md) for platform notes and compatibility.
+**NavProbe is in alpha (`0.1.0a1`): APIs and behaviour may change.** The `--pre`
+flag enables installation of prereleases. See the
+[installation guide](docs/installation.md) for source installation, upgrades,
+platform notes, and compatibility.
 
 ## Quick start
 
