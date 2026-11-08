@@ -1,5 +1,6 @@
 """Public branding, compatibility, and helpful optional-GUI behaviour."""
 from contextlib import redirect_stderr, redirect_stdout
+from importlib.metadata import version
 import io
 import unittest
 from unittest.mock import patch
@@ -13,7 +14,7 @@ class PackagingInterfaceTests(unittest.TestCase):
     def test_new_scenario_namespace_keeps_class_identity(self):
         for name in ('Corridor','Scenario','LoopScenario','Terrain','DungeonScenario','MazeScenario'):
             self.assertIs(getattr(navprobe,name),getattr(robo_sim_py,name))
-        self.assertEqual(navprobe.__version__,'0.1.0')
+        self.assertEqual(navprobe.__version__, version('navprobe'))
         self.assertEqual(cli.parser().prog,'navprobe')
 
     def test_gui_and_preview_explain_missing_extra(self):
