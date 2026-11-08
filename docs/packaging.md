@@ -15,8 +15,9 @@ namespace exposes scenario classes and `python -m navprobe`; the established
 A saved scenario with concrete object placements can be loaded and exported
 without Scenic. GUI tests require `[gui]`, and sampling tests require `[scenic]`.
 For the complete development test suite install `.[all,dev]`.
-The Python minimum is 3.10. Current local testing is on Linux/Python 3.14;
-a cross-version/platform release matrix is not yet configured.
+The Python minimum is 3.10. GitHub CI runs the complete suite on Linux with
+Python 3.10 and 3.14; other platforms still need release testing. See
+[CI and releases](ci.md) for checks and repository setup.
 
 ## Build and check
 
@@ -62,8 +63,9 @@ XML export, and both bundled robot model loads. With a base-only installation,
 `navprobe --gui` and `navprobe preview` should explain how to install `[gui]`.
 Install the optional extras to test the editor and Scenic sampling separately.
 
-No upload or repository rename is performed by these changes. Check PyPI name
-availability before publication; choosing a local name does not reserve it.
+NavProbe is published on PyPI as an alpha release. The release workflow can
+publish subsequent versions after Trusted Publishing is configured; ordinary CI
+builds only retain downloadable artifacts. See [CI and releases](ci.md).
 
 ## Local verification record
 

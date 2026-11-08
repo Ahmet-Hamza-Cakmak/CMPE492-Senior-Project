@@ -13,8 +13,10 @@
 
 - [Architecture, Python API, and extensions](development.md).
 - [Build and validate distributions](packaging.md).
+- [CI and releases](ci.md): automated checks, required merge checks, and release-only PyPI publishing.
 - [Project licence](../LICENSE) and [third-party notices](../THIRD_PARTY_NOTICES.md).
 
 Documentation lives alongside the source so changes can be reviewed and released
-together. A GitHub wiki can provide an additional browsing interface later;
-these versioned guides remain the source of truth.
+together. The [GitHub wiki](https://github.com/Ahmet-Hamza-Cakmak/CMPE492-Senior-Project/wiki)
+provides project requirements and design diagrams; these versioned guides describe
+package installation and usage.
