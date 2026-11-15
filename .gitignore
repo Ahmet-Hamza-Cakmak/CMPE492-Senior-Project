@@ -35,3 +35,6 @@ htmlcov/
 
 # Superseded local project overview; README.md and docs/ are maintained.
 /ReadME.txt
+
+# Local coding-agent instructions.
+/AGENTS.md

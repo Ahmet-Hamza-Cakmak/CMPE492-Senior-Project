@@ -18,7 +18,7 @@ def check():
     if len(wheels) != 1 or len(sources) != 1:
         raise SystemExit('Expected exactly one NavProbe wheel and one source distribution in dist/.')
     expected = {}
-    for package in ('navprobe', 'robo_sim_py'):
+    for package in ('navprobe',):
         for path in (ROOT / 'src' / package).rglob('*'):
             if path.is_file() and '__pycache__' not in path.parts and path.suffix not in ('.pyc', '.pyo'):
                 expected[path.relative_to(ROOT / 'src').as_posix()] = path.read_bytes()
@@ -50,14 +50,15 @@ def check():
     info = metadata_paths[0].rsplit('/', 1)[0]
     entrypoints = configparser.ConfigParser()
     entrypoints.read_string(wheel[info + '/entry_points.txt'].decode())
-    assert entrypoints['console_scripts']['navprobe'] == 'robo_sim_py.cli:main'
-    assert entrypoints['console_scripts']['robo-sim-py'] == 'robo_sim_py.cli:main'
-    for name in ('LICENSE', 'THIRD_PARTY_NOTICES.md', 'src/robo_sim_py/assets/google_robot/LICENSE'):
+    assert entrypoints['console_scripts']['navprobe'] == 'navprobe.cli:main'
+    assert entrypoints['console_scripts']['robo-sim-py'] == 'navprobe.cli:main'
+    for name in ('LICENSE', 'THIRD_PARTY_NOTICES.md', 'src/navprobe/assets/google_robot/LICENSE'):
         content = (ROOT / name).read_bytes()
         assert wheel.get(info + '/licenses/' + name) == content, name
         assert sdist.get(name) == content, name
     for name in (*wheel, *sdist):
         parts = Path(name).parts
+        assert 'robo_sim_py' not in parts, name
         assert not any(part in ('.venv', '.venv~', '__pycache__', '.git', 'report') for part in parts), name
         assert not Path(name).name.startswith('report-v2.'), name
         assert name not in ('dungeon.xml', 'populated.xml', 'challenge.xml'), name

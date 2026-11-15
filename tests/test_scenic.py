@@ -11,9 +11,9 @@ import unittest
 
 import numpy as np
 
-from robo_sim_py import cli
-from robo_sim_py.scenarios.scenic_adapter import sample_scenic, preset_from_parameters
-from robo_sim_py.scenarios.library import load_preset
+from navprobe import cli
+from navprobe.scenarios.scenic_adapter import sample_scenic, preset_from_parameters
+from navprobe.scenarios.library import load_preset
 
 
 class ScenicParameterTests(unittest.TestCase):

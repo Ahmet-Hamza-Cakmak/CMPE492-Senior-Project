@@ -52,8 +52,9 @@ To install a downloaded wheel, use
 
 ## Commands and platform notes
 
-`python -m navprobe` is equivalent to `navprobe`. Existing `robo-sim-py` commands,
-`python -m robo_sim_py`, and Python imports from `robo_sim_py` remain supported.
+`python -m navprobe` is equivalent to `navprobe`. The older `robo-sim-py` console
+command remains an alias. The implementation and Python API use `navprobe`;
+see [migration guidance](api.md#migrating-earlier-alpha-integrations) for earlier imports.
 The scenario API is also available as `from navprobe import MazeScenario`.
 Installing the GUI extra is necessary for `--gui` and `preview`; opening a
 MuJoCo simulation viewer itself does not require PySide6.

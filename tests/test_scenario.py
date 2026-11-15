@@ -6,8 +6,8 @@ import unittest
 
 import mujoco
 
-from robo_sim_py import Corridor, Scenario
-from robo_sim_py.simulation import build_model, example_robot
+from navprobe import Corridor, Scenario
+from navprobe.simulation import build_model, example_robot
 
 
 class ScenarioTests(unittest.TestCase):

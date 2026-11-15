@@ -6,22 +6,28 @@ Commands and source paths assume the repository root unless stated otherwise.
 
 ## Project organization
 
-Application code is grouped by responsibility under [src/robo_sim_py/](../src/robo_sim_py/):
+The API and implementation both live under [src/navprobe/](../src/navprobe/).
+See the [Python API guide](api.md) for supported imports and examples. Code is
+grouped by responsibility:
 
 | Area | What belongs here |
 | --- | --- |
-| [ui/](../src/robo_sim_py/ui/) | [editor.py](../src/robo_sim_py/ui/editor.py) contains the PySide6 window and process controls; [preview.py](../src/robo_sim_py/ui/preview.py) draws the track preview. |
-| [scenarios/](../src/robo_sim_py/scenarios/) | [__init__.py](../src/robo_sim_py/scenarios/__init__.py) defines corridor and loop geometry; [library.py](../src/robo_sim_py/scenarios/library.py) loads/saves scenarios; [presets/](../src/robo_sim_py/scenarios/presets/) holds built-in track and maze configurations. |
-| [simulation/](../src/robo_sim_py/simulation/) | [__init__.py](../src/robo_sim_py/simulation/__init__.py) builds and runs MuJoCo models; [walls.py](../src/robo_sim_py/simulation/walls.py) calculates wall geometry; [__main__.py](../src/robo_sim_py/simulation/__main__.py) is the separate viewer process entry point. |
-| [assets/](../src/robo_sim_py/assets/) | [__init__.py](../src/robo_sim_py/assets/__init__.py) registers robot examples; [tracking.py](../src/robo_sim_py/assets/tracking.py) provides shared driving logic. Each robot folder keeps its controller, XML, and supporting assets together. |
-| [experiments/](../src/robo_sim_py/experiments/) | Validates ZIP packages and manifests; defines the controller context, lifecycle and robot placement. |
+| [ui/](../src/navprobe/ui/) | [editor.py](../src/navprobe/ui/editor.py) contains the PySide6 window and process controls; [preview.py](../src/navprobe/ui/preview.py) draws the track preview. |
+| [scenarios/](../src/navprobe/scenarios/) | [__init__.py](../src/navprobe/scenarios/__init__.py) defines corridor and loop geometry; [library.py](../src/navprobe/scenarios/library.py) loads/saves scenarios; [presets/](../src/navprobe/scenarios/presets/) holds built-in track and maze configurations. |
+| [simulation/](../src/navprobe/simulation/) | [__init__.py](../src/navprobe/simulation/__init__.py) builds and runs MuJoCo models; [walls.py](../src/navprobe/simulation/walls.py) calculates wall geometry; [__main__.py](../src/navprobe/simulation/__main__.py) is the separate viewer process entry point. |
+| [assets/](../src/navprobe/assets/) | [__init__.py](../src/navprobe/assets/__init__.py) registers robot examples; [tracking.py](../src/navprobe/assets/tracking.py) provides shared driving logic. Each robot folder keeps its controller, XML, and supporting assets together. |
+| [experiments/](../src/navprobe/experiments/) | Validates ZIP packages and manifests; defines the controller context, lifecycle and robot placement. |
 | [tests/](../tests/) | Geometry, driving, UI, persistence, and worker-process regression tests. |
 
-The package's [__main__.py](../src/robo_sim_py/__main__.py) is intentionally small: it starts the terminal interface; `--gui` opens the editor. Small robot controller files are also intentional—they configure shared tracking logic rather than duplicate it. Package marker files establish Python import boundaries.
+The package's [__main__.py](../src/navprobe/__main__.py) is intentionally small: it starts the terminal interface; `--gui` opens the editor. Small robot controller files are also intentional—they configure shared tracking logic rather than duplicate it. Package marker files establish Python import boundaries.
 
 To change the UI, start in the UI folder. To add a preset, add JSON in the preset folder. To add a robot, create its asset folder and register it in the asset registry. To change physics or walls, use the simulation folder.
 
-The public imports `from robo_sim_py import Corridor, Scenario, LoopScenario` and `from robo_sim_py.simulation import build_model, example_robot, run` remain unchanged. Internal imports moved to their corresponding areas; the old flat modules are removed. User-saved scenarios remain in the same application-data directory and require no migration.
+Use `navprobe` imports for integrations. CLI and GUI call these implementation
+modules directly. Short convenience modules such as `navprobe.generation` expose
+related operations without duplicating their logic. Earlier Python integrations
+need the import changes described in the [migration guide](api.md#migrating-earlier-alpha-integrations);
+saved scenario formats are unchanged.
 
 ## Robot files
 
@@ -39,27 +45,27 @@ After updating the source, reinstall before launching (or use `python -m pip ins
 
 ```bash
 python -m pip install .
-python -m robo_sim_py
+python -m navprobe
 ```
 
 ## Example layout and adding robots
 
 Each example keeps its model and controller together:
 
-- [assets/simple_robot/](../src/robo_sim_py/assets/simple_robot/): [robot.xml](../src/robo_sim_py/assets/simple_robot/robot.xml) and [controller.py](../src/robo_sim_py/assets/simple_robot/controller.py).
-- [assets/google_robot/](../src/robo_sim_py/assets/google_robot/): [robot.xml](../src/robo_sim_py/assets/google_robot/robot.xml), [controller.py](../src/robo_sim_py/assets/google_robot/controller.py), meshes/textures, upstream license, and [adaptation notes](../src/robo_sim_py/assets/google_robot/MODEL_NOTES.md).
+- [assets/simple_robot/](../src/navprobe/assets/simple_robot/): [robot.xml](../src/navprobe/assets/simple_robot/robot.xml) and [controller.py](../src/navprobe/assets/simple_robot/controller.py).
+- [assets/google_robot/](../src/navprobe/assets/google_robot/): [robot.xml](../src/navprobe/assets/google_robot/robot.xml), [controller.py](../src/navprobe/assets/google_robot/controller.py), meshes/textures, upstream license, and [adaptation notes](../src/navprobe/assets/google_robot/MODEL_NOTES.md).
 
 The Google example adapts the Menagerie fixed-base robot with a free base, driven wheels, approximate base inertia and support contacts. Its controller holds the arm while driving. The original Menagerie checkout is not needed at runtime. The added base dynamics are approximations, not a hardware-calibrated model. Start with the default 0.8 m corridor width or wider.
 
-[assets/tracking.py](../src/robo_sim_py/assets/tracking.py) contains the shared steering and wheel-feedback algorithm. Robot-specific controllers configure or extend it. [assets/__init__.py](../src/robo_sim_py/assets/__init__.py) maps each bundled model to its controller and supplies the GUI choices. The obsolete top-level controller wrapper has been removed; import a robot-specific controller directly if needed.
+[assets/tracking.py](../src/navprobe/assets/tracking.py) contains the shared steering and wheel-feedback algorithm. Robot-specific controllers configure or extend it. [assets/__init__.py](../src/navprobe/assets/__init__.py) maps each bundled model to its controller and supplies the GUI choices. The obsolete top-level controller wrapper has been removed; import a robot-specific controller directly if needed.
 
 To add another supported example, create a package under the assets directory with its model, assets, controller and `__init__.py`, then register a `RobotExample` in the registry. Controllers accept `(model, scenario)` and provide `update(data)`. Registering it makes it appear in the GUI without adding robot-specific GUI or simulation branches. Custom XML can still be loaded for manual simulation; Python files beside arbitrary XML are never automatically executed. Additional asset file formats must also be included in the package-data configuration.
 
 ## Python API and verification
 
 ```python
-from robo_sim_py import Corridor, Scenario
-from robo_sim_py.simulation import build_model, example_robot, run
+from navprobe import Corridor, Scenario
+from navprobe.simulation import build_model, example_robot, run
 
 scenario = Scenario((Corridor(2), Corridor(1.5, 90), Corridor(2, -45)))
 robot_path = example_robot("google_robot")  # or "simple_robot"
@@ -69,4 +75,5 @@ run(model, scenario, auto_follow=True, robot_path=robot_path)
 
 Run headless tests after installation with `python -m unittest discover -s tests`. These check geometry, validation, model loading, actual driving through turns, endpoint braking, and controller reset; the Qt editor tests use offscreen rendering, while interactive MuJoCo requires a desktop display.
 
-The broader research proposal remains in [ReadME.txt](../ReadME.txt).
+The [project wiki](https://github.com/Ahmet-Hamza-Cakmak/CMPE492-Senior-Project/wiki)
+contains project requirements and design diagrams.

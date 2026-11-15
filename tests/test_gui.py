@@ -12,8 +12,8 @@ from PySide6.QtWidgets import QApplication, QMessageBox
 from PySide6.QtCore import QProcess, Qt
 from PySide6.QtTest import QTest
 
-from robo_sim_py.ui.editor import ScenarioWindow
-from robo_sim_py.scenarios.library import discover_presets
+from navprobe.ui.editor import ScenarioWindow
+from navprobe.scenarios.library import discover_presets
 
 
 class EditorTests(unittest.TestCase):
@@ -33,12 +33,12 @@ class EditorTests(unittest.TestCase):
         self.directory.cleanup()
 
     def test_scenic_sample_loads_editable_corridors_from_loop_category(self):
-        from robo_sim_py import Corridor, Scenario
-        from robo_sim_py.scenarios.library import ScenarioPreset
+        from navprobe import Corridor, Scenario
+        from navprobe.scenarios.library import ScenarioPreset
         preset = ScenarioPreset("Scenic sample", "Flat sampled corridors", Scenario((Corridor(3), Corridor(2, 45)), width=1.2))
         self.window.category_choice.setCurrentIndex(self.window.category_choice.findData("loops"))
-        with patch('robo_sim_py.ui.editor.QInputDialog.getInt', return_value=(7, True)), \
-             patch('robo_sim_py.scenarios.scenic_adapter.sample_scenic', return_value=preset) as sample:
+        with patch('navprobe.ui.editor.QInputDialog.getInt', return_value=(7, True)), \
+             patch('navprobe.scenarios.scenic_adapter.sample_scenic', return_value=preset) as sample:
             self.window.scenic_button.click()
         sample.assert_called_once_with(seed=7)
         self.assertEqual(self.window.category_choice.currentData(), 'corridors')
@@ -48,8 +48,8 @@ class EditorTests(unittest.TestCase):
 
     def test_scenic_sampling_failure_preserves_current_scenario(self):
         original = self.window.scenario()
-        with patch('robo_sim_py.ui.editor.QInputDialog.getInt', return_value=(7, True)), \
-             patch('robo_sim_py.scenarios.scenic_adapter.sample_scenic', side_effect=ValueError('Missing optional Scenic')), \
+        with patch('navprobe.ui.editor.QInputDialog.getInt', return_value=(7, True)), \
+             patch('navprobe.scenarios.scenic_adapter.sample_scenic', side_effect=ValueError('Missing optional Scenic')), \
              patch.object(QMessageBox, 'warning') as warning:
             self.window.scenic_button.click()
         warning.assert_called_once()
@@ -71,7 +71,7 @@ class EditorTests(unittest.TestCase):
         self.assertEqual(arguments[arguments.index('--navigation-clearance')+1],'0.35')
         self.assertEqual(json.loads(self.window.pending_scenario)['type'],'dungeon')
 
-    def test_assignment_zip_without_manifest_launches_as_script(self):
+    def test_full_zip_without_manifest_launches_as_script(self):
         from zipfile import ZipFile
         archive_path = Path(self.directory.name) / "whatever.zip"
         with ZipFile(archive_path, 'w') as archive:
@@ -178,7 +178,7 @@ class EditorTests(unittest.TestCase):
         with patch.object(self.window.process, "start"):
             self.window.launch()
         self.assertEqual(json.loads(self.window.pending_scenario)["terrain"]["seed"], 17)
-        with patch("robo_sim_py.ui.editor.QInputDialog.getText", return_value=("My experiment", True)):
+        with patch("navprobe.ui.editor.QInputDialog.getText", return_value=("My experiment", True)):
             self.window.save_scenario()
         entries, errors = discover_presets(self.directory.name)
         self.assertFalse(errors)
@@ -229,7 +229,7 @@ class EditorTests(unittest.TestCase):
         self.window.preset_choice.setCurrentIndex(1)
         self.assertEqual(self.window.scenario().shape, "figure_eight")
         self.window.radius.setText("4")
-        with patch("robo_sim_py.ui.editor.QInputDialog.getText", return_value=("Large eight", True)):
+        with patch("navprobe.ui.editor.QInputDialog.getText", return_value=("Large eight", True)):
             self.window.save_scenario()
         with patch.object(self.window.process, "start"):
             self.window.launch()
@@ -272,7 +272,7 @@ class EditorTests(unittest.TestCase):
             results.append(output)
             script = (
                 "import json,sys,time; from pathlib import Path; "
-                "from robo_sim_py import Scenario,Corridor; "
+                "from navprobe import Scenario,Corridor; "
                 "p=json.load(sys.stdin); s=Scenario(tuple(Corridor(**c) for c in p['corridors'])); "
                 "Path(sys.argv[1]).write_text(json.dumps(s.points())); time.sleep(20)"
             )

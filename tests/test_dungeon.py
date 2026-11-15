@@ -13,13 +13,13 @@ os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 import mujoco
 from shapely.geometry import LineString, Point, box
 
-from robo_sim_py import DungeonScenario, Terrain
-from robo_sim_py import cli
-from robo_sim_py.scenarios.dungeon import dungeon_layout
-from robo_sim_py.scenarios.library import ScenarioPreset, parse_preset, load_preset
-from robo_sim_py.simulation import build_model, example_robot, load_scene
-from robo_sim_py.simulation.generation import export_scene
-from robo_sim_py.simulation.walls import wall_segments
+from navprobe import DungeonScenario, Terrain
+from navprobe import cli
+from navprobe.scenarios.dungeon import dungeon_layout
+from navprobe.scenarios.library import ScenarioPreset, parse_preset, load_preset
+from navprobe.simulation import build_model, example_robot, load_scene
+from navprobe.simulation.generation import export_scene
+from navprobe.simulation.walls import wall_segments
 
 
 class DungeonTests(unittest.TestCase):
@@ -110,7 +110,7 @@ class DungeonGuiTests(unittest.TestCase):
         cls.app=QApplication.instance() or QApplication([])
 
     def test_edit_preview_import_and_category_switch(self):
-        from robo_sim_py.ui.editor import ScenarioWindow
+        from navprobe.ui.editor import ScenarioWindow
         with tempfile.TemporaryDirectory() as directory:
             window=ScenarioWindow(directory)
             try:

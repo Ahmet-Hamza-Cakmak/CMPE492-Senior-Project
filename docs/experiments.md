@@ -5,21 +5,21 @@ The source selector supports:
 | Choice | Environment | Robot and controller |
 | --- | --- | --- |
 | Built-in experiments / generated tracks | Adjustable corridor or registered loop, with flat/waves/random terrain | Bundled robot/controller, or a custom XML without automatic control |
-| Assignment / full experiment ZIP | The assignment script builds it, or a manifest declares a complete scene | Script owns the simulation; manifest packages use the controller API |
+| Full ZIP testing | The supplied entry-point script builds it, or a manifest declares a complete scene | Script owns the simulation; manifest packages use the controller API |
 | Robot + controller ZIP on generated track | The circuit and terrain selected in the editor | Package's robot-only XML and Python controller |
 | Import MuJoCo scene XML | Complete XML loaded as supplied | Whatever the scene includes; no Python controller is loaded |
 
 Changing modes preserves the current generated-track settings. Click Open/Restart to apply changes to a running simulation. JSON Save/Import remains a **track** library, not an experiment or controller library.
 
-## Standard assignment submissions: no manifest required
+## Full ZIP testing: no manifest required for standalone entry points
 
 ZIP filenames and their enclosing folder names are unrestricted by convention: `submission.zip`, `my test.zip`, or any other filesystem-valid name works. Detection uses the files inside, not an `A2-...` naming pattern. Place `python/main.py`, `scenes/` (containing at least one XML), and optional `data/` at the ZIP root or inside a single enclosing folder.
 
-Choose **Assignment / full experiment ZIP**. Without `experiment.json`, the app runs `python/main.py` as `__main__` from the assignment root. The script owns scene/robot assembly, controls, the viewer, stepping, and telemetry. No `create_controller()` adapter or commands JSON is required. Sibling Python imports work. The standard entry point is launched without command-line arguments; scripts requiring extra mandatory arguments need suitable defaults or adaptation.
+Choose **Full ZIP testing**. Without `experiment.json`, the app runs `python/main.py` as `__main__` from the experiment root. The script owns scene/robot assembly, controls, the viewer, stepping, and telemetry. No `create_controller()` adapter or commands JSON is required. Sibling Python imports work. The standard entry point is launched without command-line arguments; scripts requiring extra mandatory arguments need suitable defaults or adaptation.
 
-If the script uses Menagerie, select your local checkout in the optional folder field. For this mode it is made available both as `mujoco_menagerie/` within the working directory and as a sibling of the assignment root. This supports both the provided starter's relative paths and scripts resolving the checkout from `__file__`. The app does not guess the robot or rewrite the script.
+If the script uses Menagerie, select your local checkout in the optional folder field. For this mode it is made available both as `mujoco_menagerie/` within the working directory and as a sibling of the experiment root. This supports both the provided starter's relative paths and scripts resolving the checkout from `__file__`. The app does not guess the robot or rewrite the script.
 
-Each standalone run receives a new persistent directory under the application's data directory (`~/.local/share/line-tracker-sim/runs/` on Linux by default, respecting `XDG_DATA_HOME`). The extracted assignment and any files the script writes there are retained after success, failure or Stop. The editor displays the run's assignment directory when the worker finishes. The original ZIP stays unchanged. You can remove old run folders when no longer needed. Because submissions can include large telemetry files, each retained run uses additional disk space.
+Each standalone run receives a new persistent directory under the application's data directory (`~/.local/share/line-tracker-sim/runs/` on Linux by default, respecting `XDG_DATA_HOME`). The extracted experiment and any files the script writes there are retained after success, failure or Stop. The editor displays the run's experiment directory when the worker finishes. The original ZIP stays unchanged. You can remove old run folders when no longer needed. Because full ZIP packages can include large output files, each retained run uses additional disk space.
 
 When `experiment.json` **is present**, its explicit manifest configuration takes precedence and the managed full/robot controller API below applies. It remains required for robot-only packages to be driven on an app-generated track; a standalone script cannot automatically have its environment replaced.
 
@@ -29,14 +29,14 @@ From the repository root:
 
 ```bash
 python examples/make_packages.py
-python -m robo_sim_py
+python -m navprobe
 ```
 
 Select **Robot + controller ZIP on generated track** and browse to `examples/A2-robot-demo.zip`. Start with a flat straight corridor. This controller uses the known reference route and the supplied simple robot's existing follower.
 
 Select **Full experiment ZIP** and browse to `examples/A2-full-demo.zip`. This example runs a short fixed wheel-torque sequence in an enclosed scene. It does not follow a line or complete a lap. It applies zero torque after the sequence, which allows coasting rather than active braking.
 
-Read the source before accepting the controller trust prompt. Stop closes the worker independently of the editor. The editor sends a termination request, then force-stops an unresponsive worker. For managed manifest packages, normal close, Python exceptions and graceful termination call `close()` and remove the temporary extraction. Forced termination cannot guarantee controller cleanup. For managed manifest packages, files written inside the extracted package are temporary; save any intended results to an explicitly chosen external location. Standard standalone assignments instead retain their run directory as described above.
+Read the source before accepting the controller trust prompt. Stop closes the worker independently of the editor. The editor sends a termination request, then force-stops an unresponsive worker. For managed manifest packages, normal close, Python exceptions and graceful termination call `close()` and remove the temporary extraction. Forced termination cannot guarantee controller cleanup. For managed manifest packages, files written inside the extracted package are temporary; save any intended results to an explicitly chosen external location. Standard full ZIP entry-point scripts instead retain their run directory as described above.
 
 ## ZIP layout
 
@@ -55,7 +55,7 @@ A2-name-surname/
     └── reference.json          # Optional controller inputs
 ```
 
-ZIP the assignment folder or its contents. If provided, the manifest must be at the ZIP root or immediately inside one enclosing folder. Include all required files except a separately selected Menagerie checkout. XML assets/includes retain their relative structure. Source files are never rewritten.
+ZIP the experiment folder or its contents. If provided, the manifest must be at the ZIP root or immediately inside one enclosing folder. Include all required files except a separately selected Menagerie checkout. XML assets/includes retain their relative structure. Source files are never rewritten.
 
 ZIP validation rejects traversal paths, symlinks/special files, duplicate paths, encrypted archives, ambiguous manifests, and packages exceeding 256 MiB compressed, 1 GiB expanded, or 10,000 entries. Validation inspects data only; it does not import Python. XML syntax and referenced asset loading are checked by MuJoCo in the worker, and failures are displayed in the editor.
 
@@ -87,6 +87,11 @@ Required fields: `version`, `name`, `mode`, `controller`, and either `scene` or 
 
 Fields `robot`, `scene`, `controller`, and `route` must name files inside the package. Unknown manifest fields are rejected so misspelled settings do not silently take effect. This manifest is separate from the scenario JSON formats.
 
+Ordinary generated-scenario simulations pass configuration to the worker in memory;
+they do not automatically archive tested scenarios or create a replay database.
+Manual scenario save/export is separate from the working directory used to run
+user-supplied full ZIP scripts. Those scripts may create their own output files.
+
 ## Controller API
 
 `python/main.py` exports `create_controller()` returning an object with these methods:
@@ -110,13 +115,19 @@ def create_controller():
     return Controller()
 ```
 
-The app owns `MjData`, stepping, timing and the viewer. A standalone assignment script that creates its own viewer/loop must be adapted to this interface. Each worker imports one controller; regular sibling imports such as `import helpers` are supported. Relative package imports should use a normal subpackage under `python/`.
+The app owns `MjData`, stepping, timing and the viewer. A full ZIP entry-point script that creates its own viewer/loop must be adapted to this interface. Each worker imports one controller; regular sibling imports such as `import helpers` are supported. Relative package imports should use a normal subpackage under `python/`.
+
+The lifecycle types can be imported with
+`from navprobe.controllers import Controller, ControllerContext`.
+For generated environments, `navprobe.scenarios.placement_geometry` and
+`navprobe.scenarios.static_objects` expose the current planar map information;
+see [map and controller inputs](api.md#map-and-controller-inputs).
 
 `context` provides:
 
 | Attribute | Value |
 | --- | --- |
-| `root` | `Path` to the extracted assignment root |
+| `root` | `Path` to the extracted experiment root |
 | `config` | Manifest's controller settings |
 | `scenario` | Generated scenario object for robot mode; `None` for full mode |
 | `route` | Ordered XY centreline tuple for generated tracks; `None` for full mode |
@@ -128,7 +139,7 @@ Controllers may use the known route, MuJoCo sensor data, or a fixed sequence of 
 
 Imported Python has your user's file/network permissions. The separate process keeps the editor responsive and allows stopping, but **is not a security sandbox**. The app asks for trust on each launch and binds approval to the ZIP's SHA-256 hash; the worker rejects a ZIP changed since approval. The hash identifies bytes, not authorship or safety.
 
-For managed manifest packages, set `"menagerie": true` and select your local `mujoco_menagerie` folder. The chooser remembers that path. The app places a temporary sibling link to it, matching the assignment layout:
+For managed manifest packages, set `"menagerie": true` and select your local `mujoco_menagerie` folder. The chooser remembers that path. The app places a temporary sibling link to it, matching the experiment layout:
 
 ```text
 <temporary root>/

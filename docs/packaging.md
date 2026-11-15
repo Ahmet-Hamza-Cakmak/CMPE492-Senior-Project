@@ -1,8 +1,10 @@
 # Building NavProbe
 
-NavProbe is the distribution name and primary CLI command. The `navprobe`
-namespace exposes scenario classes and `python -m navprobe`; the established
-`robo_sim_py` implementation and `robo-sim-py` command remain compatible.
+NavProbe is the distribution name, primary CLI command, and Python implementation
+namespace. Code and runtime assets live under `src/navprobe/`. Both `navprobe` and
+the older `robo-sim-py` command resolve to `navprobe.cli:main`; Python module
+execution uses `python -m navprobe`. The old Python implementation namespace is
+no longer distributed.
 
 ## Dependencies
 
@@ -72,7 +74,7 @@ builds only retain downloadable artifacts. See [CI and releases](ci.md).
 The initial 0.1.0 artifacts were installed into a fresh temporary virtual
 environment without GUI or Scenic, then exercised outside the repository.
 Both bundled robot models loaded, all nine presets were discovered, maze XML
-export succeeded, frozen static-object scenarios replayed without Scenic, and
+export succeeded, frozen static-object scenarios reloaded without Scenic, and
 GUI/preview commands reported the missing extra cleanly. The environment used
 Python 3.14, MuJoCo 3.17, NumPy 2.5, and Shapely 2.2 on Linux. The development
 suite additionally uses the locally installed optional integrations.

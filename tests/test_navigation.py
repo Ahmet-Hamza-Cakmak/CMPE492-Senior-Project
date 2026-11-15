@@ -15,14 +15,14 @@ import mujoco
 from shapely.geometry import box, LineString
 from shapely.ops import unary_union
 
-from robo_sim_py import DungeonScenario, Corridor, Scenario
-from robo_sim_py.assets import create_controller, controller_mode
-from robo_sim_py.navigation import astar, plan_dungeon
-from robo_sim_py.scenarios.objects import StaticObjectSettings
-from robo_sim_py.scenarios.dungeon_population import populate_dungeon, dungeon_objects
-from robo_sim_py.scenarios.dungeon import dungeon_layout
-from robo_sim_py.simulation import build_model, example_robot, run
-from robo_sim_py import cli
+from navprobe import DungeonScenario, Corridor, Scenario
+from navprobe.assets import create_controller, controller_mode
+from navprobe.navigation import astar, plan_dungeon
+from navprobe.scenarios.objects import StaticObjectSettings
+from navprobe.scenarios.dungeon_population import populate_dungeon, dungeon_objects
+from navprobe.scenarios.dungeon import dungeon_layout
+from navprobe.simulation import build_model, example_robot, run
+from navprobe import cli
 
 
 class PlannerTests(unittest.TestCase):
@@ -71,15 +71,15 @@ class PlannerTests(unittest.TestCase):
 
     def test_worker_options_and_blue_overlay(self):
         import json
-        from robo_sim_py.simulation.__main__ import main
-        from robo_sim_py.scenarios.library import ScenarioPreset
-        from robo_sim_py.navigation import draw_route, PlannedRoute
+        from navprobe.simulation.__main__ import main
+        from navprobe.scenarios.library import ScenarioPreset
+        from navprobe.navigation import draw_route, PlannedRoute
         scenario=DungeonScenario()
         with patch('sys.argv',['worker','--robot',str(example_robot()),'--auto-follow','--navigation','astar',
                                '--grid-resolution','.2','--navigation-clearance','.35','--simulation-speed','5']), \
              patch('sys.stdin',io.StringIO(json.dumps(ScenarioPreset('Test','',scenario).to_dict()))), \
-             patch('robo_sim_py.simulation.__main__.build_model') as build, \
-             patch('robo_sim_py.simulation.__main__.run') as runner:
+             patch('navprobe.simulation.__main__.build_model') as build, \
+             patch('navprobe.simulation.__main__.run') as runner:
             self.assertEqual(main(),0)
             self.assertEqual(runner.call_args.kwargs['navigation'],'astar')
             self.assertEqual(runner.call_args.kwargs['simulation_speed'],5)
@@ -98,8 +98,8 @@ class PlannerTests(unittest.TestCase):
             viewer=SimpleNamespace(cam=mujoco.MjvCamera(),is_running=Mock(side_effect=[True]*5+[False]),sync=Mock())
             ticks=itertools.count(0,.000001)
             with patch('mujoco.viewer.launch_passive') as launch, \
-                 patch('robo_sim_py.simulation.time.monotonic',side_effect=lambda:next(ticks)), \
-                 patch('robo_sim_py.simulation.time.sleep') as sleep, \
+                 patch('navprobe.simulation.time.monotonic',side_effect=lambda:next(ticks)), \
+                 patch('navprobe.simulation.time.sleep') as sleep, \
                  patch('mujoco.mj_step',wraps=mujoco.mj_step) as step:
                 launch.return_value.__enter__.return_value=viewer
                 run(model,scenario,controller=managed,context=object(),simulation_speed=speed)

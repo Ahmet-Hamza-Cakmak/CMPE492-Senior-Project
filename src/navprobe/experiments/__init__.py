@@ -89,7 +89,7 @@ def read_manifest(root, digest=''):
 def open_package(path, *, menagerie_directory=None, expected_digest=None):
     """Extract into an isolated temporary folder; remove it after the run ends.
 
-    Accept files at ZIP root or within one enclosing assignment directory.
+    Accept files at ZIP root or within one enclosing experiment directory.
     Limits, path checks and link rejection protect extraction, not controller execution.
     """
     path = Path(path).expanduser()
@@ -126,23 +126,23 @@ def open_package(path, *, menagerie_directory=None, expected_digest=None):
                 manifests = [rel for rel in files if rel.name == 'experiment.json']
                 if manifests:
                     if len(manifests) != 1 or len(manifests[0].parts) > 2:
-                        raise ValueError('ZIP needs one experiment.json at its root or inside one assignment folder.')
+                        raise ValueError('ZIP needs one experiment.json at its root or inside one experiment folder.')
                     prefix = manifests[0].parent
                 else:
                     candidates = [rel.parent.parent for rel in files
                                   if rel.parts[-2:] == ('python', 'main.py') and len(rel.parts) <= 3]
                     if len(candidates) != 1:
-                        raise ValueError('ZIP needs python/main.py at its root or inside one assignment folder.')
+                        raise ValueError('ZIP needs python/main.py at its root or inside one experiment folder.')
                     prefix = candidates[0]
                     if not any(rel.is_relative_to(prefix / 'scenes') and rel.suffix.lower() == '.xml' for rel in files):
-                        raise ValueError('Assignment ZIP needs at least one XML file in scenes/.')
+                        raise ValueError('Full experiment ZIP needs at least one XML file in scenes/.')
                 for rel in directories:
                     if prefix != PurePosixPath('.') and not rel.is_relative_to(prefix):
-                        raise ValueError('All ZIP files must be inside the assignment folder.')
+                        raise ValueError('All ZIP files must be inside the experiment folder.')
                     (root / rel.relative_to(prefix)).mkdir(parents=True, exist_ok=True)
                 for rel, info in files.items():
                     if prefix != PurePosixPath('.') and not rel.is_relative_to(prefix):
-                        raise ValueError('All ZIP files must be inside the assignment folder.')
+                        raise ValueError('All ZIP files must be inside the experiment folder.')
                     target = root / rel.relative_to(prefix)
                     target.parent.mkdir(parents=True, exist_ok=True)
                     with archive.open(info) as source, target.open('xb') as output:
@@ -165,8 +165,8 @@ def open_package(path, *, menagerie_directory=None, expected_digest=None):
         yield experiment
 
 
-def run_assignment(experiment, run_directory):
-    """Execute the standard entry point in the worker; retain inputs and outputs."""
+def run_full_zip(experiment, run_directory):
+    """Execute a full ZIP entry point in its working/output directory."""
     import os
     import runpy
     import sys
@@ -174,7 +174,7 @@ def run_assignment(experiment, run_directory):
     destination = Path(run_directory).expanduser().resolve()
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.mkdir()  # Never overwrite a previous experiment.
-    root = destination / 'assignment'
+    root = destination / 'experiment'
     shutil.copytree(experiment.root, root, symlinks=True)
     external = experiment.root.parent / 'mujoco_menagerie'
     if external.is_symlink():
@@ -192,3 +192,6 @@ def run_assignment(experiment, run_directory):
         os.chdir(old_cwd)
         sys.argv[:] = old_argv
         sys.path[:] = old_path
+
+
+__all__ = ['Experiment', 'open_package', 'run_full_zip']

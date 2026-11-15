@@ -168,3 +168,48 @@ class LoopScenario:
 from .dungeon import DungeonScenario
 
 from .maze import MazeScenario
+
+
+# Load higher-level helpers after geometry classes are defined, avoiding cycles.
+from importlib import import_module as _import_module
+
+_PUBLIC_EXPORTS = {
+    "StaticBox": "objects",
+    "StaticObjectSettings": "objects",
+    "BUNDLED_DIRECTORY": "library",
+    "ScenarioPreset": "library",
+    "discover_presets": "library",
+    "load_preset": "library",
+    "parse_preset": "library",
+    "save_preset": "library",
+    "user_scenario_directory": "library",
+    "populate_scenario": "population",
+    "static_objects": "population",
+    "validate_objects": "population",
+    "navigation_connected": "population",
+    "placement_region": "population",
+    "PlacementGeometry": "spatial",
+    "placement_geometry": "spatial",
+    "sample_scenic": "scenic_adapter",
+    "DungeonLayout": "dungeon",
+    "Room": "dungeon",
+    "dungeon_layout": "dungeon",
+    "maze_layout": "maze",
+}
+
+__all__ = ["CIRCUITS", "CircuitDefinition", "Corridor", "Scenario", "LoopScenario",
+           "Terrain", "DungeonScenario", "MazeScenario", "register_circuit",
+           *_PUBLIC_EXPORTS]
+
+
+def __getattr__(name):
+    module = _PUBLIC_EXPORTS.get(name)
+    if module is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    value = getattr(_import_module(f".{module}", __name__), name)
+    globals()[name] = value
+    return value
+
+
+def __dir__():
+    return sorted(set(globals()) | set(__all__))

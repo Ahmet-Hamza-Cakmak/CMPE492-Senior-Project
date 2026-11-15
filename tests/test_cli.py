@@ -8,8 +8,8 @@ import tempfile
 import unittest
 from unittest.mock import patch, Mock
 
-from robo_sim_py import cli
-from robo_sim_py.scenarios.library import load_preset
+from navprobe import cli
+from navprobe.scenarios.library import load_preset
 
 
 class CliTests(unittest.TestCase):
@@ -26,9 +26,9 @@ class CliTests(unittest.TestCase):
         self.assertIn('--gui', output)
 
     def test_gui_is_explicit_and_gets_clean_arguments(self):
-        with patch('robo_sim_py.ui.editor.main') as gui:
+        with patch('navprobe.ui.editor.main') as gui:
             self.assertEqual(self.invoke('--gui')[0], 0)
-            gui.assert_called_once_with(['robo-sim-py'])
+            gui.assert_called_once_with(['navprobe'])
 
     def test_edit_export_import_and_save_loop(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -47,6 +47,17 @@ class CliTests(unittest.TestCase):
             self.assertIn('Experiment', self.invoke('list', 'presets', '--library', str(library))[1])
             # Never silently overwrite scenario exports.
             self.assertEqual(self.invoke('scenario', '--output', str(output))[0], 1)
+
+    def test_generated_run_passes_scenario_without_creating_archive(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            args = cli.parser().parse_args(['run', '--maze', '--maze-rows', '3',
+                                             '--maze-columns', '3', '--library', str(root / 'library')])
+            with patch.object(cli, 'save_preset', side_effect=AssertionError('Unexpected automatic save')):
+                command, payload = cli.worker_request(args)
+            self.assertIn('navprobe.simulation', command)
+            self.assertEqual(json.loads(payload)['type'], 'maze')
+            self.assertEqual(list(root.iterdir()), [])
 
     def test_corridor_editing_and_invalid_parameters(self):
         code, output = self.invoke('scenario', '--corridor', '2', '0', '--corridor', '1', '-90', '--width', '1')
@@ -83,7 +94,7 @@ class CliTests(unittest.TestCase):
     def test_package_requires_trust_and_passes_digest(self):
         package = Mock(mode='robot', menagerie=False, digest='abc123')
         package.name = 'Demo'
-        with patch('robo_sim_py.experiments.open_package') as opened:
+        with patch('navprobe.experiments.open_package') as opened:
             opened.return_value.__enter__.return_value = package
             args = cli.parser().parse_args(['run', '--package', 'demo.zip'])
             with self.assertRaisesRegex(ValueError, 'trust-package'):

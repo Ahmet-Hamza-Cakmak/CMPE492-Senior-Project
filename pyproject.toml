@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 authors = [{name = "Ahmet-Hamza-Cakmak"}]
 license = "MIT AND Apache-2.0"
-license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md", "src/robo_sim_py/assets/google_robot/LICENSE"]
+license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md", "src/navprobe/assets/google_robot/LICENSE"]
 keywords = ["robotics", "navigation", "simulation", "randomized-testing", "mujoco", "scenic"]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -36,16 +36,16 @@ all = ["PySide6>=6.8,<7", "scenic>=3.1,<4"]
 dev = ["build>=1.2", "twine>=6"]
 
 [project.scripts]
-navprobe = "robo_sim_py.cli:main"
-robo-sim-py = "robo_sim_py.cli:main"
+navprobe = "navprobe.cli:main"
+robo-sim-py = "navprobe.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["navprobe*", "robo_sim_py*"]
+include = ["navprobe*"]
 namespaces = false
 
 [tool.setuptools]
 include-package-data = false
 
 [tool.setuptools.package-data]
-robo_sim_py = ["assets/**/*.xml", "assets/**/*.stl", "assets/**/*.obj", "assets/**/*.png", "assets/**/LICENSE", "assets/**/*.md", "scenarios/presets/*.json", "scenarios/scenic/*.scenic"]
+navprobe = ["assets/**/*.xml", "assets/**/*.stl", "assets/**/*.obj", "assets/**/*.png", "assets/**/LICENSE", "assets/**/*.md", "scenarios/presets/*.json", "scenarios/scenic/*.scenic"]

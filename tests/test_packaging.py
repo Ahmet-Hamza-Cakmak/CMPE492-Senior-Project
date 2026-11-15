@@ -6,14 +6,15 @@ import unittest
 from unittest.mock import patch
 
 import navprobe
-import robo_sim_py
-from robo_sim_py import cli
+from navprobe import scenarios
+from navprobe import cli
 
 
 class PackagingInterfaceTests(unittest.TestCase):
-    def test_new_scenario_namespace_keeps_class_identity(self):
+    def test_scenario_namespace_uses_navprobe_implementation(self):
         for name in ('Corridor','Scenario','LoopScenario','Terrain','DungeonScenario','MazeScenario'):
-            self.assertIs(getattr(navprobe,name),getattr(robo_sim_py,name))
+            self.assertIs(getattr(navprobe,name),getattr(scenarios,name))
+        self.assertTrue(navprobe.MazeScenario.__module__.startswith('navprobe.'))
         self.assertEqual(navprobe.__version__, version('navprobe'))
         self.assertEqual(cli.parser().prog,'navprobe')
 

@@ -3,11 +3,11 @@ import unittest
 import mujoco
 import numpy as np
 
-from robo_sim_py import Corridor, Scenario, LoopScenario, Terrain
-from robo_sim_py.scenarios.library import ScenarioPreset, parse_preset
-from robo_sim_py.simulation import build_model, example_robot
-from robo_sim_py.simulation.terrain import HeightField
-from robo_sim_py.assets import create_controller
+from navprobe import Corridor, Scenario, LoopScenario, Terrain
+from navprobe.scenarios.library import ScenarioPreset, parse_preset
+from navprobe.simulation import build_model, example_robot
+from navprobe.simulation.terrain import HeightField
+from navprobe.assets import create_controller
 
 
 class TerrainTests(unittest.TestCase):

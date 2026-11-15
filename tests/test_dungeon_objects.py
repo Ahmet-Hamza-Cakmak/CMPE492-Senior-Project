@@ -16,15 +16,15 @@ os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 import mujoco
 import numpy as np
 
-from robo_sim_py import DungeonScenario
-from robo_sim_py import cli
-from robo_sim_py.scenarios.objects import StaticObjectSettings, StaticBox
-from robo_sim_py.scenarios.dungeon import dungeon_layout
-from robo_sim_py.scenarios.dungeon_population import (
+from navprobe import DungeonScenario
+from navprobe import cli
+from navprobe.scenarios.objects import StaticObjectSettings, StaticBox
+from navprobe.scenarios.dungeon import dungeon_layout
+from navprobe.scenarios.dungeon_population import (
     populate_dungeon, dungeon_objects, placement_region, validate_objects, _sample,
 )
-from robo_sim_py.scenarios.library import ScenarioPreset, parse_preset
-from robo_sim_py.simulation.generation import export_scene
+from navprobe.scenarios.library import ScenarioPreset, parse_preset
+from navprobe.simulation.generation import export_scene
 
 
 class ObjectValidationTests(unittest.TestCase):
@@ -79,7 +79,7 @@ class ScenicDungeonPopulationTests(unittest.TestCase):
 
     def test_navigation_obstructs_reference_but_retains_robot_sized_path(self):
         from shapely.geometry import LineString
-        from robo_sim_py.scenarios.dungeon_population import navigation_connected
+        from navprobe.scenarios.dungeon_population import navigation_connected
         for seed in (7, 42):
             scenario=populate_dungeon(DungeonScenario(objects=StaticObjectSettings(count=3,seed=seed)))
             self.assertEqual((scenario.map_width,scenario.map_height),(200,200))
@@ -92,7 +92,7 @@ class ScenicDungeonPopulationTests(unittest.TestCase):
                 self.assertFalse(LineString(clear.points()).intersects(obj.footprint()))
 
     def test_connectivity_rejects_barrier_but_allows_detour(self):
-        from robo_sim_py.scenarios.dungeon_population import navigation_connected
+        from navprobe.scenarios.dungeon_population import navigation_connected
         small=DungeonScenario(map_width=16,map_height=12,room_min=2,room_max=4,width=.8)
         layout=dungeon_layout(small)
         # A vertical barrier spanning the entire map disconnects opposite endpoints.
@@ -154,7 +154,7 @@ class ScenicDungeonPopulationTests(unittest.TestCase):
 
     def test_gui_population_preview_and_imported_sample(self):
         from PySide6.QtWidgets import QApplication
-        from robo_sim_py.ui.editor import ScenarioWindow
+        from navprobe.ui.editor import ScenarioWindow
         app=QApplication.instance() or QApplication([])
         with tempfile.TemporaryDirectory() as directory:
             window=ScenarioWindow(directory)

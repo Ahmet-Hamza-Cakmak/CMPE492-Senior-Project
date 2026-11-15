@@ -42,12 +42,12 @@ def main():
                     raise ValueError("This experiment needs a local mujoco_menagerie directory.")
                 if experiment.mode == "standalone":
                     if args.simulation_speed != 1:
-                        raise ValueError("Standalone assignments own their simulation pacing.")
-                    from ..experiments import run_assignment
+                        raise ValueError("Full ZIP entry-point scripts own their simulation pacing.")
+                    from ..experiments import run_full_zip
                     from ..scenarios.library import user_scenario_directory
                     import uuid
                     destination = args.run_directory or user_scenario_directory().parent / 'runs' / uuid.uuid4().hex
-                    run_assignment(experiment, destination)
+                    run_full_zip(experiment, destination)
                     return 0
                 scenario = parse_preset(json.load(sys.stdin)).scenario if experiment.mode == "robot" else None
                 model = build_model(experiment.model_path, scenario) if scenario else load_scene(experiment.model_path)

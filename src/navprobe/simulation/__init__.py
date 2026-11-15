@@ -111,3 +111,6 @@ def run(model, scenario=None, *, auto_follow=False, robot_path=None, controller=
     finally:
         if managed:
             controller.close()
+
+
+__all__ = ['build_model', 'example_robot', 'load_scene', 'run']

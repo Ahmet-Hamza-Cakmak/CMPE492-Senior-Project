@@ -11,9 +11,9 @@ from unittest.mock import patch
 import mujoco
 import numpy as np
 
-from robo_sim_py import Corridor, Scenario, LoopScenario, Terrain
-from robo_sim_py import cli
-from robo_sim_py.simulation.generation import (
+from navprobe import Corridor, Scenario, LoopScenario, Terrain
+from navprobe import cli
+from navprobe.simulation.generation import (
     GenerationPipeline, generate_spec, export_scene, ground_stage, walls_stage,
 )
 

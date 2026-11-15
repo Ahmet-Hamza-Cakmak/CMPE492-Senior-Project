@@ -14,11 +14,11 @@ import tempfile
 def main():
     import navprobe
     from navprobe import Corridor, MazeScenario, Scenario
-    from robo_sim_py.assets import EXAMPLES
-    from robo_sim_py.scenarios.library import BUNDLED_DIRECTORY, discover_presets
-    from robo_sim_py.scenarios.objects import StaticBox, StaticObjectSettings
-    from robo_sim_py.simulation import build_model, load_scene
-    from robo_sim_py.simulation.generation import export_scene
+    from navprobe.robots import EXAMPLES
+    from navprobe.scenarios import BUNDLED_DIRECTORY, discover_presets
+    from navprobe.scenarios import StaticBox, StaticObjectSettings
+    from navprobe.simulation import build_model, load_scene
+    from navprobe import export_scene
 
     source = Path(__file__).resolve().parents[1] / 'src'
     assert not Path(navprobe.__file__).resolve().is_relative_to(source), 'Imported checkout instead of installed wheel'
@@ -39,6 +39,9 @@ def main():
         if not executable.exists():
             executable = Path(shutil.which(name) or '')
         subprocess.run([str(executable), '--help'], check=True, capture_output=True, timeout=30)
+    subprocess.run([sys.executable, '-m', 'navprobe.simulation', '--help'],
+                   check=True, capture_output=True, text=True, timeout=30)
+    assert importlib.util.find_spec('robo_sim_py') is None, 'Old Python namespace unexpectedly distributed'
     assert 'simple_robot' in cli('list', 'robots')
     presets, errors = discover_presets(BUNDLED_DIRECTORY)
     assert presets and not errors, errors

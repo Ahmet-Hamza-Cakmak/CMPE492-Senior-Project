@@ -147,3 +147,6 @@ def draw_route(scene, route):
                             np.eye(3).ravel(),np.array([.05,.35,.95,1.]))
         mujoco.mjv_connector(geom,mujoco.mjtGeom.mjGEOM_LINE,3.,[a[0],a[1],.025],[b[0],b[1],.025])
         scene.ngeom += 1
+
+
+__all__ = ['PlannedRoute', 'astar', 'plan_scenario', 'plan_dungeon', 'draw_route']

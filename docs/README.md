@@ -11,7 +11,8 @@
 
 ## Developing NavProbe
 
-- [Architecture, Python API, and extensions](development.md).
+- [Python API](api.md): public imports, environment generation, map inputs, planning, and execution.
+- [Architecture and extensions](development.md).
 - [Build and validate distributions](packaging.md).
 - [CI and releases](ci.md): automated checks, required merge checks, and release-only PyPI publishing.
 - [Project licence](../LICENSE) and [third-party notices](../THIRD_PARTY_NOTICES.md).

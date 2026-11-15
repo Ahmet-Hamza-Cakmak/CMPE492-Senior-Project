@@ -19,17 +19,24 @@ def parser():
     root = argparse.ArgumentParser(prog="navprobe", description="NavProbe: randomized robot navigation testing. No arguments opens the interactive navprobe> prompt.",
                                    formatter_class=argparse.RawDescriptionHelpFormatter,
                                    epilog="""Usage:
-  Terminal:           python -m robo_sim_py COMMAND [OPTIONS]
-  Inside navprobe>:   COMMAND [OPTIONS]  (omit python -m robo_sim_py)
+  Terminal:           navprobe COMMAND [OPTIONS]
+  Python module:      python -m navprobe COMMAND [OPTIONS]
+  Inside navprobe>:   COMMAND [OPTIONS]  (omit navprobe)
 
 Start here:
   list presets          Show available track presets.
-  generate --help       Ground, wall layout, and XML export options.
-  run --help            Simulation and robot options.
+  generate --help       Terrain, layouts, static obstacles, and XML export.
+  run --help            Robot/controller selection, A*, and playback speed.
+  scenario --help       Save, reload, and edit scenario JSON.
+
+Optional installs: navprobe[gui] for editor/preview; navprobe[scenic] for sampling.
+Dynamic obstacles, runtime monitoring, and automated campaigns are not available yet.
+
+Python API: from navprobe import MazeScenario, export_scene
 
 Interactive controls: status, stop, restart, exit.
 Use help COMMAND inside the prompt, or COMMAND --help in either context.""")
-    root.add_argument("--gui", action="store_true", help="open the desktop editor")
+    root.add_argument("--gui", action="store_true", help="open the desktop editor (requires navprobe[gui] and a desktop display)")
     commands = root.add_subparsers(dest="command")
     listing = commands.add_parser("list", help="list robots or scenario presets")
     listing.add_argument("kind", choices=("robots", "presets"), default="presets", nargs="?")
@@ -40,8 +47,8 @@ Use help COMMAND inside the prompt, or COMMAND --help in either context.""")
         item.description = {
             "generate": "Generate ground, layout walls, and optional static objects, and export an environment-only MuJoCo scene. No GUI or simulation starts.",
             "run": "Run a robot on a generated track, or load an existing scene or experiment package.",
-            "scenario": "Inspect or export editable scenario JSON, or save it in the preset library. This does not export MuJoCo XML; use generate for XML.",
-            "preview": "Open a top-down preview of the selected track layout.",
+            "scenario": "Inspect or save editable scenario JSON, including concrete static-object placements when populated. Reload with --scenario. Use generate for MuJoCo XML.",
+            "preview": "Open a top-down geometry preview, including static obstacles; requires navprobe[gui] and a desktop display. This does not compute the A* route.",
         }[action]
         examples = {
             "generate": """  generate --corridor 3 0 --corridor 2 90 --width 1.2 --output scene.xml
@@ -53,22 +60,30 @@ Use help COMMAND inside the prompt, or COMMAND --help in either context.""")
             "run": """  run --preset 04_zigzag --robot simple_robot
   run --loop circle --terrain random --height 0.003 --seed 7
   run --scene scene.xml
-  run --robot /path/to/robot.xml --no-auto-follow""",
+  run --robot /path/to/robot.xml --no-auto-follow
+  run --maze --static-objects 3 --navigation astar --simulation-speed 5
+  run --scenario saved-maze.json --robot simple_robot
+  run --package robot.zip --maze --trust-package""",
             "scenario": """  scenario --preset 04_zigzag
   scenario --corridor 3 0 --corridor 2 -90 --width 1.2 --output my-track.json
-  scenario --scenario my-track.json --terrain random --seed 7 --name 'Bumpy track' --save""",
+  scenario --scenario my-track.json --terrain random --seed 7 --name 'Bumpy track' --save
+  scenario --maze --static-objects 3 --object-seed 9 --output saved-maze.json""",
             "preview": """  preview --preset 04_zigzag
   preview --loop figure_eight --radius 3""",
         }
-        item.epilog = ("""Examples (inside navprobe>; prepend python -m robo_sim_py in a terminal):
+        item.epilog = ("""Examples (inside navprobe>; prepend navprobe in a terminal):
 """ + examples[action] + """
 
 Dungeon example: generate --dungeon --rooms 6 --room-shape circular --layout-seed 7 --output scene.xml
 Population example: generate --dungeon --static-objects 4 --object-seed 9 --output boxes.xml
-Boxes use Scenic and require the scenic extra. Navigation placement allows boxes on
-the reference route while preserving a path for --robot-radius. The bundled line
-follower does not avoid boxes; use a navigation controller or --no-auto-follow.
-Dungeons use flat ground only. The black line marks a known route, not maze solving.
+New box samples require navprobe[scenic]; saved concrete placements can be reloaded
+without Scenic. Navigation placement targets the reference route while preserving
+geometric connectivity for --robot-radius; it does not guarantee controller success.
+With simple_robot, --navigation auto selects A* on flat dungeons, mazes, and
+populated corridors/loops. Other robots and uneven tracks retain line following,
+which does not avoid boxes. --no-auto-follow disables the bundled controller.
+The black ground line is the reference route; the blue viewer overlay is the A*
+plan. Dungeons and mazes use flat ground and known maps, without exploration.
 Maze example: generate --maze --maze-algorithm prim --maze-rows 8 --maze-columns 10 --width 2 --cell-size 3 --layout-seed 7 --output maze.xml
 Maze navigation: run --maze --maze-algorithm growing-tree --newest-probability 0.7 --loop-fraction 0.1 --simulation-speed 5
 Mazes default to 8×8 cells, 3 m cell spacing, 2 m passages; flat ground only.
@@ -92,6 +107,24 @@ Exports contain no robot or controller. Uneven terrain also creates a sibling
 must not already exist, and the parent directory must exist.
 run --scene opens the exported environment for inspection. Use run with the
 same track options and --robot to simulate a robot on the generated track.
+"""
+        if action == "scenario":
+            item.epilog += """
+Save once, then reuse the same populated environment:
+  scenario --maze --static-objects 3 --output saved-maze.json
+  run --scenario saved-maze.json --robot simple_robot
+Unchanged saved placements are reused. Changing layout/population settings may
+invalidate or resample placements. This saves an environment, not a complete run
+record. Automatic test-case archiving and historical replay are outside scope.
+"""
+        if action == "run":
+            item.epilog += """
+--navigation, --grid-resolution, and --navigation-clearance apply to generated
+layouts, not imported scenes or packages. Explicit A* requires simple_robot on
+flat ground with automatic driving enabled. Grid/clearance options require A*.
+Full experiment ZIPs supply their own environment; only robot ZIPs accept layout
+options. --trust-package permits imported Python execution; it is not a sandbox.
+--simulation-speed changes playback pacing only, not physics time or robot speed.
 """
         source = item.add_mutually_exclusive_group()
         source.add_argument("--scenic", type=Path, nargs="?", const=Path(__file__).parent / "scenarios/scenic/flat_corridors.scenic", help="sample a trusted Scenic file, or omit the path for bundled flat corridors; requires the scenic extra")
@@ -120,20 +153,20 @@ same track options and --robot to simulate a robot on the generated track.
             item.add_argument("--" + option, type=kind, help=description)
         item.add_argument("--room-shape", choices=("rectangular", "circular"), help="BSP room shape (default: rectangular); circular size is diameter")
         for option, kind, description in (
-            ("static-objects", int, "fixed boxes in generated layouts, 0–30; Scenic placement (default: 0)"),
-            ("object-seed", int, "Scenic placement seed; changing it leaves the layout fixed (default: 42)"),
-            ("object-min-size", float, "minimum box width/length in metres (default: 0.25)"),
-            ("object-max-size", float, "maximum box width/length in metres (default: 0.6)"),
-            ("object-height", float, "fixed box height in metres (default: 0.4)"),
-            ("robot-radius", float, "circular robot radius for obstacle-aware start/goal connectivity, metres (default: 0.3)"),
-            ("object-clearance", float, "minimum wall/object clearance in metres (default: 0.1)"),
+            ("static-objects", int, "fixed boxes in generated layouts, 0–30; Scenic placement (default: 0); 0 disables population"),
+            ("object-seed", int, "Scenic placement seed, 0–2147483647; changing it leaves the layout fixed (default: 42)"),
+            ("object-min-size", float, "minimum box width/length in metres, > 0 and <= maximum (default: 0.25)"),
+            ("object-max-size", float, "maximum box width/length in metres, <= 3 (default: 0.6)"),
+            ("object-height", float, "fixed box height in metres, > 0 and <= 3 (default: 0.4)"),
+            ("robot-radius", float, "circular footprint radius for placement connectivity, > 0 and <= 2 metres (default: 0.3); separate from A* --navigation-clearance"),
+            ("object-clearance", float, "minimum wall/object clearance in metres, 0–2 (default: 0.1)"),
         ):
             item.add_argument("--" + option, type=kind, help=description)
         item.add_argument("--object-placement", choices=("navigation", "clear-route"),
                           help="navigation allows route/passage obstacles and targets the first box on the reference route; clear-route keeps the baseline route clear (default: navigation)")
         source.add_argument("--loop", choices=tuple(CIRCUITS), help="closed wall layout: circle or figure_eight; default radius/scale 2 m")
         source.add_argument("--corridor", nargs=2, type=float, action="append", metavar=("LENGTH", "TURN"), help="add a section: LENGTH > 0 metres, TURN in degrees (-180 < TURN < 180); first TURN must be 0; positive turns left, negative right; repeat in route order")
-        item.add_argument("--width", type=float, help="usable corridor/track width in metres, excluding walls; must exceed line width (new-track default: 0.8)")
+        item.add_argument("--width", type=float, help="usable corridor/track width in metres, excluding walls; must exceed line width (defaults: corridors/loops 0.8, dungeons 3, mazes 2)")
         item.add_argument("--line-width", type=float, help="painted center-line width in metres; > 0 and < track width (new-track default: 0.025)")
         item.add_argument("--radius", type=float, help="loop radius/scale in metres; requires a loop source and must be at least twice the track width (default: 2)")
         item.add_argument("--terrain", choices=("flat", "waves", "random"), help="ground surface: flat, smooth waves, or seeded random bumps (new-track default: flat)")
@@ -147,8 +180,8 @@ same track options and --robot to simulate a robot on the generated track.
         if action == "scenario":
             item.add_argument("--name", help="display name for the exported/saved scenario; quote names containing spaces")
             item.add_argument("--description", help="description stored in exported/saved scenario JSON")
-            item.add_argument("--save", action="store_true", help="add to the scenario library")
-            item.add_argument("--output", type=Path, help="export JSON to a new file")
+            item.add_argument("--save", action="store_true", help="save the configured scenario and concrete placements to --library")
+            item.add_argument("--output", type=Path, help="export scenario JSON and concrete placements to a new file; parent directory must exist")
         if action == "run":
             item.add_argument("--navigation", choices=("auto", "line", "astar"), help="auto selects A* for simple_robot flat dungeons/mazes or populated tracks; otherwise line following")
             item.add_argument("--grid-resolution", type=float, help="A* grid spacing in metres (default: 0.25); finer grids resolve narrower passages")
@@ -156,11 +189,11 @@ same track options and --robot to simulate a robot on the generated track.
             item.add_argument("--simulation-speed", type=float, default=1.0, help="playback multiplier, 0.1–20 (default: 1); changes pacing, not physical robot speed or timestep")
             model = item.add_mutually_exclusive_group()
             model.add_argument("--robot", default=None, help="registered robot key or custom XML path (default: simple_robot)")
-            model.add_argument("--scene", type=Path, help="load a complete scene unchanged")
-            model.add_argument("--package", type=Path, help="full, robot or assignment ZIP; mode detected automatically")
+            model.add_argument("--scene", type=Path, help="open existing XML unchanged; no robot or Python controller is added, including for environment-only exports")
+            model.add_argument("--package", type=Path, help="full ZIP testing (environment, robot, controller) or robot/controller ZIP; mode detected automatically")
             item.add_argument("--auto-follow", action=argparse.BooleanOptionalAction, default=None, help="defaults to on for registered robots")
             item.add_argument("--menagerie", type=Path, help="local MuJoCo Menagerie directory for packages that require it; requires --package")
-            item.add_argument("--run-directory", type=Path, help="retained assignment output directory")
+            item.add_argument("--run-directory", type=Path, help="working/output directory for full ZIP entry-point scripts")
             item.add_argument("--trust-package", action="store_true", help="explicitly permit the selected ZIP's Python code to run")
     validate = commands.add_parser("validate", help="validate scenario JSON, scene XML or experiment ZIP without running Python controllers")
     validate.add_argument("path", type=Path, help="scenario .json, complete scene .xml, or experiment .zip to validate")
@@ -257,7 +290,7 @@ def worker_request(args):
         raise ValueError("--navigation-clearance must be at least 0.25 m.")
     if navigation_options and (args.scene or args.package):
         raise ValueError("Navigation options apply to generated tracks with registered robots; imported scenes/packages provide their own controller.")
-    arguments = ["-m", "robo_sim_py.simulation", "--simulation-speed", str(args.simulation_speed)]
+    arguments = ["-m", "navprobe.simulation", "--simulation-speed", str(args.simulation_speed)]
     payload = b""
     track_options = ("maze_algorithm", "maze_rows", "maze_columns", "cell_size", "newest_probability", "loop_fraction", "object_placement", "robot_radius", "static_objects", "object_seed", "object_min_size", "object_max_size", "object_height", "object_clearance", "map_width", "map_height", "rooms", "room_min", "room_max", "room_shape", "layout_seed", "scenic", "scenic_seed", "preset", "scenario", "loop", "corridor", "width", "line_width", "radius",
                      "terrain", "height", "spacing", "resolution", "seed")
@@ -288,14 +321,14 @@ def worker_request(args):
             if args.menagerie:
                 arguments.extend(["--menagerie", str(args.menagerie.expanduser().resolve())])
             if args.run_directory and experiment.mode != "standalone":
-                raise ValueError("--run-directory is only supported for standalone assignment packages.")
+                raise ValueError("--run-directory is only supported for full ZIP packages with a standalone entry point.")
             if experiment.mode == "standalone":
                 if args.simulation_speed != 1:
-                    raise ValueError("Standalone assignment scripts own their simulation pacing.")
+                    raise ValueError("Full ZIP entry-point scripts own their simulation pacing.")
                 destination = args.run_directory or user_scenario_directory().parent / "runs" / uuid.uuid4().hex
                 destination = destination.expanduser().resolve()
                 arguments.extend(["--run-directory", str(destination)])
-                print(f"Assignment outputs: {destination / 'assignment'}")
+                print(f"Full ZIP outputs: {destination / 'experiment'}")
             if experiment.mode == "robot":
                 payload = json.dumps(selected_preset(args).to_dict(), allow_nan=False).encode()
     else:
@@ -359,7 +392,7 @@ def preview(preset):
     require_gui()
     from PySide6.QtWidgets import QApplication
     from .ui.preview import TrackPreview
-    app = QApplication.instance() or QApplication(["robo-sim-py preview"])
+    app = QApplication.instance() or QApplication(["navprobe preview"])
     window = TrackPreview()
     window.setWindowTitle(preset.name)
     window.resize(800, 600)
@@ -374,7 +407,7 @@ def execute(args, shell=None):
             raise ValueError("Use --gui without a CLI command.")
         require_gui()
         from .ui.editor import main as gui_main
-        gui_main(["robo-sim-py"])
+        gui_main(["navprobe"])
         return 0
     if args.command == "list":
         if args.kind == "robots":

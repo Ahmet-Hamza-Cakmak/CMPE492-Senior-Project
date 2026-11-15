@@ -11,13 +11,13 @@ import zipfile
 import mujoco
 import numpy as np
 
-from robo_sim_py import Corridor, Scenario, LoopScenario
-from robo_sim_py.experiments import open_package, run_assignment
-from robo_sim_py.experiments.controllers import load_controller, place_robot
-from robo_sim_py.scenarios import CIRCUITS, CircuitDefinition, register_circuit
-from robo_sim_py.scenarios.library import ScenarioPreset
-from robo_sim_py.simulation import build_model, load_scene, run, example_robot
-from robo_sim_py.simulation.__main__ import main
+from navprobe import Corridor, Scenario, LoopScenario
+from navprobe.experiments import open_package, run_full_zip
+from navprobe.experiments.controllers import load_controller, place_robot
+from navprobe.scenarios import CIRCUITS, CircuitDefinition, register_circuit
+from navprobe.scenarios.library import ScenarioPreset
+from navprobe.simulation import build_model, load_scene, run, example_robot
+from navprobe.simulation.__main__ import main
 
 EXAMPLES = Path(__file__).resolve().parents[1] / 'examples'
 
@@ -43,7 +43,7 @@ class ExperimentTests(unittest.TestCase):
     def tearDown(self):
         self.temp.cleanup()
 
-    def test_manifest_free_assignment_any_zip_name_and_persistent_outputs(self):
+    def test_manifest_free_full_zip_any_zip_name_and_persistent_outputs(self):
         import os
         import sys
         zip_path = self.root / "anything with spaces ü.zip"
@@ -73,10 +73,10 @@ Path('data/result.txt').write_text(helper.VALUE)
                 with open_package(zip_path, menagerie_directory=menagerie) as experiment:
                     self.assertEqual(experiment.mode, 'standalone')
                     with patch('sys.stdout', io.StringIO()):
-                        run_assignment(experiment, destination)
+                        run_full_zip(experiment, destination)
                 self.assertEqual(os.getcwd(), cwd)
                 self.assertEqual(sys.argv, argv)
-                self.assertEqual((destination / 'assignment/data/result.txt').read_text(), 'completed')
+                self.assertEqual((destination / 'experiment/data/result.txt').read_text(), 'completed')
                 self.assertTrue((menagerie / 'model.xml').exists())
                 sys.modules.pop('helper', None)
 
@@ -91,7 +91,7 @@ Path('data/result.txt').write_text(helper.VALUE)
              patch('sys.stderr', io.StringIO()) as errors, patch('sys.stdout', io.StringIO()):
             self.assertEqual(main(), 1)
             self.assertIn('example failure', errors.getvalue())
-        self.assertEqual((destination / 'assignment/result.txt').read_text(), 'started')
+        self.assertEqual((destination / 'experiment/result.txt').read_text(), 'started')
 
     def test_examples_load_drive_and_cleanup(self):
         for mode in ('full', 'robot'):
@@ -151,7 +151,7 @@ Path('data/result.txt').write_text(helper.VALUE)
             with open_package(self.zip):
                 pass
         make_zip(self.zip)
-        with patch('robo_sim_py.experiments.MAX_EXPANDED', 10), self.assertRaisesRegex(ValueError, 'expanded'):
+        with patch('navprobe.experiments.MAX_EXPANDED', 10), self.assertRaisesRegex(ValueError, 'expanded'):
             with open_package(self.zip):
                 pass
 
@@ -195,7 +195,7 @@ Path('data/result.txt').write_text(helper.VALUE)
             payload = json.dumps(ScenarioPreset('Track', '', Scenario((Corridor(1),))).to_dict())
             with patch('sys.argv', ['worker', '--package', str(self.zip), '--approved-sha256', digest]), \
                  patch('sys.stdin', io.StringIO(payload)), \
-                 patch('robo_sim_py.simulation.__main__.run') as viewer:
+                 patch('navprobe.simulation.__main__.run') as viewer:
                 self.assertEqual(main(), 0)
                 self.assertIn('controller', viewer.call_args.kwargs)
                 self.assertEqual(viewer.call_args.args[1] is None, mode == 'full')

@@ -90,7 +90,7 @@ class ScenarioWindow(QMainWindow):
         self.source_choice = QComboBox()
         self.source_choice.addItem("Built-in experiments / generated tracks", "generated")
         self.source_choice.addItem("Import MuJoCo scene XML", "scene")
-        self.source_choice.addItem("Assignment / full experiment ZIP", "full")
+        self.source_choice.addItem("Full ZIP testing", "full")
         self.source_choice.addItem("Robot + controller ZIP on generated track", "robot")
         layout.addWidget(self.source_choice)
         self.scene_card, scene_layout = card("MuJoCo scene")
@@ -127,7 +127,7 @@ class ScenarioWindow(QMainWindow):
         dependency_browse.clicked.connect(self.browse_menagerie)
         dependency_row.addWidget(dependency_browse)
         package_layout.addLayout(dependency_row)
-        package_note = QLabel("Assignment ZIPs run python/main.py directly; no JSON file is required. "
+        package_note = QLabel("Full ZIP testing uses your environment, robot, and controller. Without a manifest, python/main.py runs directly. "
                               "Advanced packages can use experiment.json. "
                               "You will be asked to trust the Python code before it runs. "
                               "A full experiment supplies its own environment; robot packages use the track below.")
@@ -752,7 +752,7 @@ class ScenarioWindow(QMainWindow):
                         QMessageBox.StandardButton.Cancel)
                     if answer != QMessageBox.StandardButton.Yes:
                         return
-                    arguments = ["-m", "robo_sim_py.simulation", "--package", str(package_path),
+                    arguments = ["-m", "navprobe.simulation", "--package", str(package_path),
                                  "--approved-sha256", experiment.digest]
                     if experiment.mode == "standalone":
                         run_directory = user_scenario_directory().parent / "runs" / uuid.uuid4().hex
@@ -763,7 +763,7 @@ class ScenarioWindow(QMainWindow):
                 scene_path = Path(self.scene_path.text()).expanduser().resolve()
                 if not self.scene_path.text().strip() or not scene_path.is_file():
                     raise ValueError("Select an existing scene XML file.")
-                arguments = ["-m", "robo_sim_py.simulation", "--scene", str(scene_path)]
+                arguments = ["-m", "navprobe.simulation", "--scene", str(scene_path)]
                 pending_scenario = b""
             else:
                 preset = ScenarioPreset("Simulation", "", self.scenario())
@@ -771,7 +771,7 @@ class ScenarioWindow(QMainWindow):
                 if not robot_path.is_file():
                     raise ValueError("Select an existing robot XML file.")
                 pending_scenario = json.dumps(preset.to_dict(), allow_nan=False).encode("utf-8")
-                arguments = ["-m", "robo_sim_py.simulation", "--robot", str(robot_path)]
+                arguments = ["-m", "navprobe.simulation", "--robot", str(robot_path)]
                 arguments.extend(["--simulation-speed", str(self.simulation_speed.value())])
                 if self.auto_follow.isChecked():
                     from ..assets import controller_mode
@@ -827,7 +827,7 @@ class ScenarioWindow(QMainWindow):
         self.stop_button.setEnabled(False)
         self.refresh()
         if self.last_run_directory and self.last_run_directory.is_dir():
-            self.status.setText(f"Experiment files and outputs kept in {self.last_run_directory / 'assignment'}")
+            self.status.setText(f"Experiment files and outputs kept in {self.last_run_directory / 'experiment'}")
         if code != 0 and not self.stopping:
             QMessageBox.warning(self, "Simulation error", self.last_error_output or "MuJoCo closed unexpectedly.")
 

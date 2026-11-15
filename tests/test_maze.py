@@ -13,14 +13,14 @@ os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 import mujoco
 from shapely.geometry import LineString, Point
 
-from robo_sim_py import MazeScenario, Terrain
-from robo_sim_py.scenarios.maze import ALGORITHMS, maze_layout
-from robo_sim_py.scenarios.library import ScenarioPreset, parse_preset, load_preset, save_preset
-from robo_sim_py import cli
-from robo_sim_py.simulation import build_model, example_robot
-from robo_sim_py.simulation.generation import export_scene
-from robo_sim_py.assets import create_controller, controller_mode
-from robo_sim_py.navigation import plan_dungeon
+from navprobe import MazeScenario, Terrain
+from navprobe.scenarios.maze import ALGORITHMS, maze_layout
+from navprobe.scenarios.library import ScenarioPreset, parse_preset, load_preset, save_preset
+from navprobe import cli
+from navprobe.simulation import build_model, example_robot
+from navprobe.simulation.generation import export_scene
+from navprobe.assets import create_controller, controller_mode
+from navprobe.navigation import plan_dungeon
 
 
 class MazeTests(unittest.TestCase):
@@ -160,7 +160,7 @@ class MazeEditorTests(unittest.TestCase):
         cls.app=QApplication.instance() or QApplication([])
 
     def test_gui_edit_save_import_and_launch(self):
-        from robo_sim_py.ui.editor import ScenarioWindow
+        from navprobe.ui.editor import ScenarioWindow
         with tempfile.TemporaryDirectory() as directory:
             w=ScenarioWindow(directory)
             try:

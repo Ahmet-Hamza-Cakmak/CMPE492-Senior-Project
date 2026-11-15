@@ -1,5 +1,5 @@
 """Example adapter: use the supplied route with this robot's existing follower."""
-from robo_sim_py.assets.simple_robot.controller import LineFollower
+from navprobe.assets.simple_robot.controller import LineFollower
 
 
 class Controller:

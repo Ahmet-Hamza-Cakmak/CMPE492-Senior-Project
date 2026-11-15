@@ -19,7 +19,7 @@ The corridors have white floors, black center lines, and solid light-gray walls 
 
 Presets are versioned JSON files, independent of the robot model and controller. Both example robots can run the bundled presets. You can use the form to make a custom track and save it under a new name; saving never overwrites a bundled preset.
 
-Built-in scenarios live in [scenarios/presets/](../src/robo_sim_py/scenarios/presets/). To ship another corridor scenario, add a JSON file there using this format and reinstall (or use an editable install). No GUI registration or Python changes are required:
+Built-in scenarios live in [scenarios/presets/](../src/navprobe/scenarios/presets/). To ship another corridor scenario, add a JSON file there using this format and reinstall (or use an editable install). No GUI registration or Python changes are required:
 
 ```json
 {
@@ -43,7 +43,7 @@ User scenarios are loaded automatically on the next launch from:
 
 **Import JSON…** loads a file for the current session; use **Save to library…** to retain it between launches. Invalid scenario files are reported without preventing other presets from loading. Version 1 describes corridor tracks and remains supported unchanged. Version 2 supports the loop type described below. Version 3 supports seeded BSP dungeons. Other environment types, such as obstacle fields, would also need a new geometry builder.
 
-[scenarios/library.py](../src/robo_sim_py/scenarios/library.py) handles validation, discovery, and persistence. [ui/editor.py](../src/robo_sim_py/ui/editor.py) manages the Qt editor, [ui/preview.py](../src/robo_sim_py/ui/preview.py) draws the schematic, and [simulation/__main__.py](../src/robo_sim_py/simulation/__main__.py) launches the separate MuJoCo process. The physics and controllers remain independent of the UI toolkit.
+[scenarios/library.py](../src/navprobe/scenarios/library.py) handles validation, discovery, and persistence. [ui/editor.py](../src/navprobe/ui/editor.py) manages the Qt editor, [ui/preview.py](../src/navprobe/ui/preview.py) draws the schematic, and [simulation/__main__.py](../src/navprobe/simulation/__main__.py) launches the separate MuJoCo process. The physics and controllers remain independent of the UI toolkit.
 
 ## Loop tracks
 
@@ -52,7 +52,7 @@ User scenarios are loaded automatically on the next launch from:
 - **Circle circuit:** 2 m radius, closed walls and a marked start line.
 - **Figure-eight circuit:** an infinity-shaped track at 3 m scale, with an open, flat central crossing. It has no bridge; both lobes share the crossing.
 
-Both start at the origin facing +X. With automatic driving enabled, the controller follows the ordered route and repeats laps until you stop the simulation. It does not finish or brake at the end of the first lap. The route order prevents it from taking the wrong branch at the figure-eight crossing. These examples use the existing automatic geometric controller, not the manual control required by the racing assignment.
+Both start at the origin facing +X. With automatic driving enabled, the controller follows the ordered route and repeats laps until you stop the simulation. It does not finish or brake at the end of the first lap. The route order prevents it from taking the wrong branch at the figure-eight crossing. These examples use the existing automatic geometric controller, not the manual control required by the original racing exercise.
 
 The curves use short connected segments for physics. The loop size must be at least twice the track width; smaller tight turns are not supported by the editor. This geometric validation does not guarantee that every robot can handle every size.
 
@@ -90,7 +90,7 @@ The surface is a collidable MuJoCo `hfield`, with the road and line painted onto
 "terrain": {"mode": "random", "height": 0.003, "spacing": 0.8, "resolution": 129, "seed": 42}
 ```
 
-JSON/Python height uses **metres**; the GUI displays **centimetres**. In Python, pass `terrain=Terrain("random", height=0.003, spacing=0.8, resolution=129, seed=42)` to `Scenario` or `LoopScenario` (import `Terrain` from `robo_sim_py`). Generation and surface painting live in [simulation/terrain.py](../src/robo_sim_py/simulation/terrain.py).
+JSON/Python height uses **metres**; the GUI displays **centimetres**. In Python, pass `terrain=Terrain("random", height=0.003, spacing=0.8, resolution=129, seed=42)` to `Scenario` or `LoopScenario` (import `Terrain` from `navprobe`). Generation and surface painting live in [simulation/terrain.py](../src/navprobe/simulation/terrain.py).
 
 The existing controllers were tuned for flat ground. The Google example can stall on slopes or at turns, even with small bumps; successful completion is not guaranteed. Terrain settings deliberately allow experiments beyond either robot's capabilities.
 
@@ -104,7 +104,7 @@ Install the optional integration in the Python environment used to run the app:
 python -m pip install -e ".[scenic]"
 ```
 
-The bundled [flat_corridors.scenic](../src/robo_sim_py/scenarios/scenic/flat_corridors.scenic)
+The bundled [flat_corridors.scenic](../src/navprobe/scenarios/scenic/flat_corridors.scenic)
 models one family of environments: flat ground, 2–8 connected corridor sections,
 a shared width sampled uniformly from 0.8–1.5 m, section lengths from 2–4 m,
 and relative turns from -75 to +75 degrees. The first section always starts
@@ -117,20 +117,20 @@ prevent a route from crossing itself.
 From a terminal:
 
 ```bash
-python -m robo_sim_py generate --scenic --scenic-seed 7 --output scene.xml
-python -m robo_sim_py scenario --scenic --scenic-seed 7 --output sampled-track.json
-python -m robo_sim_py preview --scenic --scenic-seed 7
-python -m robo_sim_py run --scenic --scenic-seed 7 --robot simple_robot
+python -m navprobe generate --scenic --scenic-seed 7 --output scene.xml
+python -m navprobe scenario --scenic --scenic-seed 7 --output sampled-track.json
+python -m navprobe preview --scenic --scenic-seed 7
+python -m navprobe run --scenic --scenic-seed 7 --robot simple_robot
 ```
 
-Inside `navprobe>`, omit `python -m robo_sim_py`. `--scenic` selects the bundled
+Inside `navprobe>`, omit `python -m navprobe`. `--scenic` selects the bundled
 file; `--scenic path/to/file.scenic` selects a custom trusted file following the
 same parameter schema. It is mutually exclusive with other track sources.
 Existing width/terrain flags can override sampled settings afterward, just as
 for JSON presets; the bundled scenario itself always samples flat terrain.
 `--scenic-seed` defaults to 42 and is separate from the ordinary terrain `--seed`.
-Save sampled JSON for replay across Scenic versions, where seeded results may
-change. Scenic source executes Python code; load only trusted files.
+You may explicitly save sampled JSON to reuse a configuration across Scenic
+versions, where seeded results may change. Scenic source executes Python code; load only trusted files.
 
 In the GUI's **Scenario** card, click **Sample Scenic flat corridors…** and enter
 a sampling seed. The generated corridor count, width, lengths, turns, and flat
@@ -139,7 +139,7 @@ start simulation. Use **Save to library…** to retain the sample, or the existi
 simulation button to run it. Sampling again allows you to choose a new seed;
 unsaved edits still require the existing discard confirmation.
 
-The adapter in [scenic_adapter.py](../src/robo_sim_py/scenarios/scenic_adapter.py)
+The adapter in [scenic_adapter.py](../src/navprobe/scenarios/scenic_adapter.py)
 loads and samples Scenic through its Python API, validates the concrete
 parameters, and constructs the same `ScenarioPreset` used elsewhere. There is
 no intermediate JSON requirement. Its imports are lazy, so existing workflows
@@ -160,15 +160,15 @@ not an implementation of the paper's additional L-system corridor grammar.
 Generate an environment without opening a viewer:
 
 ```bash
-python -m robo_sim_py generate --dungeon --rooms 6 --room-shape circular --layout-seed 7 --output dungeon.xml
-python -m robo_sim_py generate --dungeon --map-width 20 --map-height 16 --rooms 8 --room-min 2 --room-max 4 --width 1 --room-shape rectangular --layout-seed 12 --output rooms.xml
-python -m robo_sim_py scenario --dungeon --room-shape circular --layout-seed 7 --output dungeon.json
-python -m robo_sim_py preview --scenario dungeon.json
-python -m robo_sim_py run --scenario dungeon.json --robot simple_robot
-python -m robo_sim_py run --scene dungeon.xml
+python -m navprobe generate --dungeon --rooms 6 --room-shape circular --layout-seed 7 --output dungeon.xml
+python -m navprobe generate --dungeon --map-width 20 --map-height 16 --rooms 8 --room-min 2 --room-max 4 --width 1 --room-shape rectangular --layout-seed 12 --output rooms.xml
+python -m navprobe scenario --dungeon --room-shape circular --layout-seed 7 --output dungeon.json
+python -m navprobe preview --scenario dungeon.json
+python -m navprobe run --scenario dungeon.json --robot simple_robot
+python -m navprobe run --scene dungeon.xml
 ```
 
-Inside `navprobe>`, omit `python -m robo_sim_py`. `--dungeon` is mutually exclusive
+Inside `navprobe>`, omit `python -m navprobe`. `--dungeon` is mutually exclusive
 with other scenario sources. Dungeon settings can also override a saved dungeon
 preset or JSON. `generate --help` describes all options.
 
@@ -210,8 +210,8 @@ range, room shape, layout seed, passage/line widths, and flat terrain settings.
 Versions 1 and 2 remain supported. In Python:
 
 ```python
-from robo_sim_py import DungeonScenario
-from robo_sim_py.simulation.generation import export_scene
+from navprobe import DungeonScenario
+from navprobe.simulation.generation import export_scene
 
 scenario = DungeonScenario(room_shape="circular", room_count=6, layout_seed=7)
 export_scene(scenario, "dungeon.xml")
@@ -221,7 +221,7 @@ export_scene(scenario, "dungeon.xml")
 ## Static objects with Scenic
 
 Corridors, loops, BSP dungeons, and mazes optionally include fixed, collidable
-boxes. Python builds the layout first. [dungeon_static.scenic](../src/robo_sim_py/scenarios/scenic/dungeon_static.scenic)
+boxes. Python builds the layout first. [dungeon_static.scenic](../src/navprobe/scenarios/scenic/dungeon_static.scenic)
 then creates actual Scenic spatial objects in placement regions supplied by the
 Python adapter. Scenic samples positions, orientations, and widths/lengths and
 checks containment and conservative inter-object separation. A Python validator
@@ -235,14 +235,14 @@ python -m pip install -e ".[scenic]"
 ```
 
 ```bash
-python -m robo_sim_py generate --dungeon --room-shape circular --layout-seed 7 --static-objects 4 --object-seed 12 --output populated.xml
-python -m robo_sim_py scenario --dungeon --static-objects 4 --object-seed 12 --output populated.json
-python -m robo_sim_py preview --scenario populated.json
-python -m robo_sim_py run --scenario populated.json --robot simple_robot --no-auto-follow
-python -m robo_sim_py generate --scenario populated.json --object-seed 13 --output another-population.xml
+python -m navprobe generate --dungeon --room-shape circular --layout-seed 7 --static-objects 4 --object-seed 12 --output populated.xml
+python -m navprobe scenario --dungeon --static-objects 4 --object-seed 12 --output populated.json
+python -m navprobe preview --scenario populated.json
+python -m navprobe run --scenario populated.json --robot simple_robot --no-auto-follow
+python -m navprobe generate --scenario populated.json --object-seed 13 --output another-population.xml
 ```
 
-Inside `navprobe>`, omit `python -m robo_sim_py`.
+Inside `navprobe>`, omit `python -m navprobe`.
 
 | Option | Meaning | Default |
 | --- | --- | --- |
@@ -293,16 +293,16 @@ Reduce count/size/clearance or increase passage width/room sizes if placement fa
 Saved scenario JSON includes both object-generation settings and concrete box
 placements. Reloading those placements validates them and does not require Scenic;
 XML loading never needs Scenic. Version 3 dungeon files without object fields
-remain supported. To replay across dependency versions, use the saved concrete
-JSON rather than relying only on a seed. Static boxes are fixed world geometry,
+remain supported. For user-managed scenario reuse across dependency versions,
+explicitly save concrete JSON rather than relying only on a seed. Static boxes are fixed world geometry,
 not free bodies; they will not fall or roll. No dynamic agents are implemented.
 
 
 For example, create a large navigation challenge:
 
 ```bash
-python -m robo_sim_py generate --dungeon --static-objects 3 --object-placement navigation --robot-radius 0.3 --object-seed 7 --output navigation-challenge.xml
-python -m robo_sim_py run --scene navigation-challenge.xml
+python -m navprobe generate --dungeon --static-objects 3 --object-placement navigation --robot-radius 0.3 --object-seed 7 --output navigation-challenge.xml
+python -m navprobe run --scene navigation-challenge.xml
 ```
 
 In the GUI, newly selected **BSP dungeons** use the larger defaults. If a saved
@@ -321,14 +321,14 @@ You can explicitly choose `--navigation line` for the original baseline or
 scene does not supply the required layout, start, and goal description.
 
 ```bash
-python -m robo_sim_py run --dungeon --static-objects 3 --object-seed 7 --robot simple_robot --navigation astar --simulation-speed 5
-python -m robo_sim_py run --scenario populated.json --navigation astar --grid-resolution 0.25 --navigation-clearance 0.3 --simulation-speed 5
+python -m navprobe run --dungeon --static-objects 3 --object-seed 7 --robot simple_robot --navigation astar --simulation-speed 5
+python -m navprobe run --scenario populated.json --navigation astar --grid-resolution 0.25 --navigation-clearance 0.3 --simulation-speed 5
 ```
 
 For quicker experiments, use a smaller world and shorter routes:
 
 ```bash
-python -m robo_sim_py run --dungeon --map-width 24 --map-height 20 --room-min 4 --room-max 7 --width 2 --static-objects 3 --navigation astar --simulation-speed 5
+python -m navprobe run --dungeon --map-width 24 --map-height 20 --room-min 4 --room-max 7 --width 2 --static-objects 3 --navigation astar --simulation-speed 5
 ```
 
 In the GUI, choose **Simple two-wheel robot**, **BSP dungeons**, and leave
@@ -374,7 +374,7 @@ The viewer syncs at up to roughly 60 Hz, while control and physics still update
 at every original physics step. Speed 1 remains the default. Accelerated playback
 is best-effort and limited by CPU/rendering throughput; it does not alter physical
 velocity limits or increase the integration timestep. The setting also works for
-CLI scene imports and managed packages, but not standalone assignment scripts
+CLI scene imports and managed packages, but not full ZIP entry-point scripts
 which own their execution loop. GUI playback controls apply to generated robot
 runs. Very large maps still mean long simulated travel distances, so the smaller
 example above is useful when testing planner behavior.
@@ -388,17 +388,17 @@ same scenario library as other layouts (maze JSON version 4).
 
 ```bash
 # Export geometry without starting a viewer:
-python -m robo_sim_py generate --maze --maze-algorithm prim --maze-rows 8 --maze-columns 10 --layout-seed 7 --output maze.xml
+python -m navprobe generate --maze --maze-algorithm prim --maze-rows 8 --maze-columns 10 --layout-seed 7 --output maze.xml
 # A small simulation with the bundled simple robot and automatic A*:
-python -m robo_sim_py run --maze --maze-algorithm dfs --maze-rows 4 --maze-columns 4 --simulation-speed 5
+python -m navprobe run --maze --maze-algorithm dfs --maze-rows 4 --maze-columns 4 --simulation-speed 5
 # Tunable Growing Tree, with some extra connections:
-python -m robo_sim_py run --maze --maze-algorithm growing-tree --newest-probability 0.7 --loop-fraction 0.15 --simulation-speed 5
+python -m navprobe run --maze --maze-algorithm growing-tree --newest-probability 0.7 --loop-fraction 0.15 --simulation-speed 5
 # Save an editable configuration:
-python -m robo_sim_py scenario --maze --maze-algorithm prim --output maze.json
-python -m robo_sim_py run --scenario maze.json
+python -m navprobe scenario --maze --maze-algorithm prim --output maze.json
+python -m navprobe run --scenario maze.json
 ```
 
-Inside `navprobe>`, omit `python -m robo_sim_py`. Use `generate --help` or
+Inside `navprobe>`, omit `python -m navprobe`. Use `generate --help` or
 `run --help` for detailed options.
 
 Defaults: 8 rows × 8 columns, 3 m cell-centre spacing, 2 m usable passages,
@@ -424,16 +424,16 @@ opens geometry; use the scenario JSON or generation flags to run navigation.
 The same object flags work with every generated scenario:
 
 ```bash
-python -m robo_sim_py run --maze --maze-rows 4 --maze-columns 4 --static-objects 3 --object-seed 7 --simulation-speed 5
-python -m robo_sim_py run --corridor 8 0 --corridor 5 90 --width 2 --static-objects 3 --object-seed 7 --simulation-speed 5
-python -m robo_sim_py run --loop circle --radius 5 --width 2 --static-objects 3 --object-seed 7 --simulation-speed 5
-python -m robo_sim_py generate --corridor 6 0 --width 2 --terrain waves --height 0.02 --spacing 1.5 --static-objects 2 --output bumpy-boxes.xml
+python -m navprobe run --maze --maze-rows 4 --maze-columns 4 --static-objects 3 --object-seed 7 --simulation-speed 5
+python -m navprobe run --corridor 8 0 --corridor 5 90 --width 2 --static-objects 3 --object-seed 7 --simulation-speed 5
+python -m navprobe run --loop circle --radius 5 --width 2 --static-objects 3 --object-seed 7 --simulation-speed 5
+python -m navprobe generate --corridor 6 0 --width 2 --terrain waves --height 0.02 --spacing 1.5 --static-objects 2 --output bumpy-boxes.xml
 ```
 
 Default 0.8 m corridors may be too narrow for a box and a robot-sized detour;
 use a wider track or smaller objects. Placement fails explicitly if the configured
 constraints cannot be met. Zero boxes requires no Scenic. Older saved scenarios
-without object fields remain supported. Concrete placements replay without Scenic.
+without object fields remain supported. Concrete placements reload without Scenic.
 
 For loops, quarter-lap anchors are protected and checked for mutual reachability;
 A* connects them in order and the follower repeats the resulting closed route.

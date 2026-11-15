@@ -1,4 +1,4 @@
-"""Scenic population of generated environments; concrete placements replay without Scenic."""
+"""Scenic population of generated environments; concrete placements reload without Scenic."""
 
 from dataclasses import replace
 from functools import lru_cache

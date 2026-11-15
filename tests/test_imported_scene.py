@@ -5,14 +5,14 @@ from unittest.mock import patch
 
 import mujoco
 
-from robo_sim_py.simulation import load_scene, build_model
-from robo_sim_py.simulation.__main__ import main
+from navprobe.simulation import load_scene, build_model
+from navprobe.simulation.__main__ import main
 
 
 class ImportedSceneTests(unittest.TestCase):
     def test_generated_scene_import_and_robot_selection_error(self):
-        from robo_sim_py import Scenario, Corridor
-        from robo_sim_py.simulation.generation import export_scene
+        from navprobe import Scenario, Corridor
+        from navprobe.simulation.generation import export_scene
 
         with tempfile.TemporaryDirectory() as directory:
             scenario = Scenario((Corridor(2),))
@@ -21,7 +21,7 @@ class ImportedSceneTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'Import MuJoCo scene XML'):
                 build_model(path, scenario)
             with patch('sys.argv', ['worker', '--scene', str(path)]), \
-                 patch('robo_sim_py.simulation.__main__.run') as viewer:
+                 patch('navprobe.simulation.__main__.run') as viewer:
                 self.assertEqual(main(), 0)
                 self.assertGreater(viewer.call_args.args[0].ngeom, 0)
 
@@ -53,7 +53,7 @@ class ImportedSceneTests(unittest.TestCase):
             self.assertLess(data.qpos[2], 2)
             self.assertEqual(path.read_text(), xml)
             with patch('sys.argv', ['worker', '--scene', str(path)]), \
-                 patch('robo_sim_py.simulation.__main__.run') as viewer:
+                 patch('navprobe.simulation.__main__.run') as viewer:
                 self.assertEqual(main(), 0)
                 self.assertEqual(viewer.call_args.args[0].ngeom, 2)
 

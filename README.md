@@ -65,8 +65,18 @@ navprobe run --maze --maze-rows 4 --maze-columns 4 --static-objects 3 --simulati
 
 Use `navprobe --help`, `navprobe generate --help`, or `navprobe run --help` for
 options. Running `navprobe` alone opens the interactive prompt.
-`python -m navprobe` is equivalent; existing `robo-sim-py` commands and
-`robo_sim_py` Python imports remain supported.
+`python -m navprobe` is equivalent. Python imports and implementation modules
+use `navprobe`; `robo-sim-py` remains an alias for the terminal command.
+
+## Python library
+
+```python
+from navprobe import MazeScenario, export_scene
+
+export_scene(MazeScenario(rows=4, columns=4), "maze.xml")
+```
+
+See the [Python API guide](docs/api.md) for planning, persistence, and simulation.
 
 ## Documentation
 

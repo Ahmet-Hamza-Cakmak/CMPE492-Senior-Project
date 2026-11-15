@@ -13,17 +13,17 @@ import mujoco
 import numpy as np
 from shapely.geometry import LineString, Point
 
-from robo_sim_py import Scenario, Corridor, LoopScenario, MazeScenario, Terrain
-from robo_sim_py.scenarios.objects import StaticObjectSettings, StaticBox
-from robo_sim_py.scenarios.spatial import placement_geometry
-from robo_sim_py.scenarios.population import populate_scenario, static_objects, placement_region, navigation_connected
-from robo_sim_py.scenarios.library import ScenarioPreset, parse_preset
-from robo_sim_py.simulation import build_model, example_robot
-from robo_sim_py.simulation.generation import export_scene
-from robo_sim_py.simulation.terrain import HeightField
-from robo_sim_py.navigation import plan_scenario
-from robo_sim_py.assets import create_controller, controller_mode
-from robo_sim_py import cli
+from navprobe import Scenario, Corridor, LoopScenario, MazeScenario, Terrain
+from navprobe.scenarios.objects import StaticObjectSettings, StaticBox
+from navprobe.scenarios.spatial import placement_geometry
+from navprobe.scenarios.population import populate_scenario, static_objects, placement_region, navigation_connected
+from navprobe.scenarios.library import ScenarioPreset, parse_preset
+from navprobe.simulation import build_model, example_robot
+from navprobe.simulation.generation import export_scene
+from navprobe.simulation.terrain import HeightField
+from navprobe.navigation import plan_scenario
+from navprobe.assets import create_controller, controller_mode
+from navprobe import cli
 
 
 def layouts():
@@ -139,7 +139,7 @@ class SharedPopulationTests(unittest.TestCase):
 
     def test_shared_gui_controls_and_saved_placements(self):
         from PySide6.QtWidgets import QApplication
-        from robo_sim_py.ui.editor import ScenarioWindow
+        from navprobe.ui.editor import ScenarioWindow
         app=QApplication.instance() or QApplication([])
         with tempfile.TemporaryDirectory() as directory:
             w=ScenarioWindow(directory)
