@@ -264,12 +264,32 @@ class ScenarioWindow(QMainWindow):
             ("max_size", "Max. box side (m)", "0.6"),
             ("height", "Box height (m)", "0.4"),
             ("clearance", "Wall / box clearance (m)", "0.1"),
-            ("robot_radius", "Robot clearance radius (m)", "0.3"),
+            ("robot_radius", "Manual footprint radius (m)", "0.3"),
         ):
             field = QLineEdit(default)
             field.editingFinished.connect(self._edited)
             self.object_fields[key] = field
             object_form.addRow(label, field)
+        self.automatic_footprint = QCheckBox("Infer from selected robot collision geometry")
+        self.automatic_footprint.setChecked(True)
+        self.object_fields["robot_radius"].setEnabled(False)
+        self.footprint_margin = QDoubleSpinBox()
+        self.footprint_margin.setRange(0, 100)
+        self.footprint_margin.setDecimals(3)
+        self.footprint_margin.setValue(.05)
+        self.footprint_margin.setSuffix(" m")
+        self.footprint_body = QLineEdit()
+        self.footprint_body.setPlaceholderText("Automatic single robot tree")
+        self.footprint_body.setToolTip("Select the root body when the XML contains several robot trees.")
+        self.footprint_note = QLabel()
+        self.footprint_note.setWordWrap(True)
+        object_form.addRow(self.automatic_footprint)
+        object_form.addRow("Inference clearance margin", self.footprint_margin)
+        object_form.addRow("Robot root body (optional)", self.footprint_body)
+        object_form.addRow(self.footprint_note)
+        self.automatic_footprint.toggled.connect(self._footprint_mode_changed)
+        self.footprint_margin.valueChanged.connect(self._edited)
+        self.footprint_body.editingFinished.connect(self._edited)
         self.object_placement = QComboBox()
         self.object_placement.addItem("Navigation challenge (route may be blocked)", "navigation")
         self.object_placement.addItem("Keep baseline route clear", "clear-route")
@@ -453,6 +473,7 @@ class ScenarioWindow(QMainWindow):
         self.auto_follow.setChecked(example is not None)
         self.robot_note.setText("Ideal geometric tracking · bundled robot controller" if example else
                                 "Custom model · manual controls. Start at the origin, facing +X, on z=0.")
+        self.refresh()
 
     def _discard_edits(self):
         return not self.dirty or QMessageBox.question(
@@ -580,22 +601,45 @@ class ScenarioWindow(QMainWindow):
         self.terrain_seed.setEnabled(mode == "random")
         self._edited()
 
-    def scenario(self):
+    def _footprint_mode_changed(self, automatic):
+        self.object_fields["robot_radius"].setEnabled(not automatic)
+        self.footprint_margin.setEnabled(automatic)
+        self.footprint_body.setEnabled(automatic)
+        self._edited()
+
+    def scenario(self, *, robot_path=None):
         from dataclasses import replace
-        from ..scenarios.objects import StaticObjectSettings
-        from ..scenarios.population import populate_scenario
+        from ..services import ScenarioOptions, configure_scenario
         base = self._base_scenario()
+        loaded = getattr(self, "_loaded_scenario", None)
+        if loaded is not None and replace(loaded, objects=base.objects, static_objects=None) == base:
+            base = loaded
         try:
-            settings = StaticObjectSettings(placement=self.object_placement.currentData(), **{
-                key: int(field.text()) if key in ("count", "seed") else float(field.text())
-                for key, field in self.object_fields.items()})
+            values = {key: int(field.text()) if key in ("count", "seed") else float(field.text())
+                      for key, field in self.object_fields.items()}
         except ValueError as exc:
             raise ValueError(f"Invalid static object settings: {exc}") from exc
-        candidate = replace(base, objects=settings)
-        loaded = getattr(self, "_loaded_scenario", None)
-        if loaded is not None and replace(loaded, static_objects=None) == candidate:
-            return populate_scenario(loaded)
-        return populate_scenario(candidate)
+        automatic = self.automatic_footprint.isChecked()
+        options = ScenarioOptions(scenario=base,
+            static_objects=values["count"], object_seed=values["seed"],
+            object_min_size=values["min_size"], object_max_size=values["max_size"],
+            object_height=values["height"], object_clearance=values["clearance"],
+            object_placement=self.object_placement.currentData(),
+            robot_radius=None if automatic else values["robot_radius"],
+            footprint_margin=self.footprint_margin.value() if automatic else None,
+            robot_body=(self.footprint_body.text().strip() or None) if automatic else None)
+        self.footprint_note.clear()
+        if self.source_choice.currentData() == "robot" and robot_path is None and automatic:
+            with open_package(self.package_path.text(), menagerie_directory=self.menagerie_path.text() or None) as experiment:
+                if experiment.mode != "robot":
+                    raise ValueError("Choose a robot-only ZIP for generated environments.")
+                result = configure_scenario(options, robot_path=experiment.model_path)
+        else:
+            result = configure_scenario(options, robot_path=robot_path or self.robot_path.text())
+        inferred = result.footprint
+        source = f"Inferred from {inferred.body}: raw {inferred.raw_radius:.3f} m + margin {inferred.margin:g} m" if inferred else "Manual footprint"
+        self.footprint_note.setText(f"{source}. Effective radius: {result.scenario.objects.robot_radius:.3f} m. Initial-pose planar check only.")
+        return result.scenario
 
     def _base_scenario(self):
         terrain = Terrain(self.terrain_mode.currentData(), self.terrain_height.value()/100,
@@ -639,7 +683,7 @@ class ScenarioWindow(QMainWindow):
                     selected = self.scenario()
                     self.preview.set_scenario(selected)
                     self.summary.setText(f"{'Closed loop' if selected.closed else 'Corridor track'} · {selected.total_length:.1f} m")
-                except ValueError as exc:
+                except (ValueError, OSError) as exc:
                     valid, error = False, str(exc)
                     self.preview.set_scenario(None)
             running = self.process.state() != QProcess.ProcessState.NotRunning
@@ -729,18 +773,15 @@ class ScenarioWindow(QMainWindow):
             QMessageBox.warning(self, "Cannot save scenario", str(exc))
 
     def launch(self):
+        from ..execution import RunOptions, prepare_run
         try:
-            run_directory = None
             source = self.source_choice.currentData()
             if source in ("full", "robot"):
                 package_path = Path(self.package_path.text()).expanduser().resolve()
                 with open_package(package_path, menagerie_directory=self.menagerie_path.text() or None) as experiment:
                     if experiment.mode != source and not (source == "full" and experiment.mode == "standalone"):
                         raise ValueError(f"This ZIP is a {experiment.mode} experiment. Select the matching source mode.")
-                    if experiment.menagerie and not self.menagerie_path.text():
-                        raise ValueError("This experiment requires your local mujoco_menagerie folder.")
-                    pending_scenario = (json.dumps(ScenarioPreset("Simulation", "", self.scenario()).to_dict(),
-                                                  allow_nan=False).encode("utf-8") if source == "robot" else b"")
+                    preset = ScenarioPreset("Simulation", "", self.scenario(robot_path=experiment.model_path)) if source == "robot" else None
                     answer = QMessageBox.question(
                         self, "Trust experiment controller?",
                         f"Run Python from '{experiment.name}'?\n\n"
@@ -752,38 +793,25 @@ class ScenarioWindow(QMainWindow):
                         QMessageBox.StandardButton.Cancel)
                     if answer != QMessageBox.StandardButton.Yes:
                         return
-                    arguments = ["-m", "navprobe.simulation", "--package", str(package_path),
-                                 "--approved-sha256", experiment.digest]
-                    if experiment.mode == "standalone":
-                        run_directory = user_scenario_directory().parent / "runs" / uuid.uuid4().hex
-                        arguments.extend(["--run-directory", str(run_directory)])
-                    if experiment.menagerie or (experiment.mode == "standalone" and self.menagerie_path.text()):
-                        arguments.extend(["--menagerie", str(Path(self.menagerie_path.text()).expanduser().resolve())])
+                    options = RunOptions(package=package_path, scenario=preset,
+                        robot_radius=preset.scenario.objects.robot_radius if preset else None,
+                        menagerie=self.menagerie_path.text() or None, trust_package=True,
+                        approved_sha256=experiment.digest)
             elif source == "scene":
-                scene_path = Path(self.scene_path.text()).expanduser().resolve()
-                if not self.scene_path.text().strip() or not scene_path.is_file():
-                    raise ValueError("Select an existing scene XML file.")
-                arguments = ["-m", "navprobe.simulation", "--scene", str(scene_path)]
-                pending_scenario = b""
+                options = RunOptions(scene=self.scene_path.text())
             else:
                 preset = ScenarioPreset("Simulation", "", self.scenario())
-                robot_path = Path(self.robot_path.text()).expanduser().resolve()
-                if not robot_path.is_file():
-                    raise ValueError("Select an existing robot XML file.")
-                pending_scenario = json.dumps(preset.to_dict(), allow_nan=False).encode("utf-8")
-                arguments = ["-m", "navprobe.simulation", "--robot", str(robot_path)]
-                arguments.extend(["--simulation-speed", str(self.simulation_speed.value())])
-                if self.auto_follow.isChecked():
-                    from ..assets import controller_mode
-                    mode = controller_mode(robot_path, preset.scenario, self.navigation_choice.currentData())
-                    arguments.extend(["--auto-follow", "--navigation", self.navigation_choice.currentData()])
-                    if mode == "astar":
-                        arguments.extend(["--grid-resolution", str(self.grid_resolution.value())])
-                        clearance = self.navigation_clearance.value()
-                        if clearance:
-                            if clearance < .25:
-                                raise ValueError("A* navigation clearance must be at least 0.25 m.")
-                            arguments.extend(["--navigation-clearance", str(clearance)])
+                automatic = self.auto_follow.isChecked()
+                options = RunOptions(scenario=preset, robot=self.robot_path.text(),
+                    robot_radius=preset.scenario.objects.robot_radius, auto_follow=automatic,
+                    navigation=self.navigation_choice.currentData() if automatic else None,
+                    grid_resolution=self.grid_resolution.value() if automatic and self.grid_resolution.value() != .25 else None,
+                    navigation_clearance=(self.navigation_clearance.value() or None) if automatic else None,
+                    simulation_speed=self.simulation_speed.value())
+            request = prepare_run(options)
+            command, pending_scenario = request.worker_request()
+            executable, arguments = command[0], command[1:]
+            run_directory = request.run_directory
         except (ValueError, OSError) as exc:
             QMessageBox.warning(self, "Cannot start simulation", str(exc))
             return
@@ -795,9 +823,6 @@ class ScenarioWindow(QMainWindow):
                 return
         self.last_run_directory = run_directory
         self.pending_scenario = pending_scenario
-        executable = sys.executable
-        if sys.platform == "darwin":
-            executable = str(Path(sys.executable).with_name("mjpython"))
         self.process.setProgram(executable)
         self.process.setArguments(arguments)
         self.last_error_output = ""
@@ -851,9 +876,9 @@ def main(argv=None):
     if sys.platform.startswith("linux") and not (
         os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY") or os.environ.get("QT_QPA_PLATFORM")
     ):
-        raise SystemExit("A desktop display is required to open the scenario editor.")
+        raise ValueError("A desktop display is required to open the scenario editor.")
     app = QApplication.instance() or QApplication(sys.argv if argv is None else argv)
     app.setStyle("Fusion")
     window = ScenarioWindow()
     window.show()
-    sys.exit(app.exec())
+    return app.exec()

@@ -1,7 +1,7 @@
 """Exercise an installed base wheel outside the checkout, without GUI or Scenic.
 
 Run with a fresh environment's Python after installing the wheel. Uses temporary
-outputs, loads MuJoCo models without a viewer, and never starts a controller.
+outputs, loads MuJoCo models, and steps a managed controller without a viewer.
 """
 import importlib.util
 from pathlib import Path
@@ -57,6 +57,17 @@ def main():
                          objects=StaticObjectSettings(count=1),
                          static_objects=(StaticBox(3, .5, .3, .3, .4),))
         assert load_scene(export_scene(saved, Path(directory) / 'saved-box.xml')).ngeom > 0
+    from navprobe import create_scenario, prepare_run, open_simulation, validate_input
+    preset = create_scenario(maze=True, maze_rows=3, maze_columns=3, robot="simple_robot")
+    request = prepare_run(scenario=preset, robot="simple_robot")
+    with open_simulation(request) as session:
+        session.step(5)
+        assert session.data.time > 0
+        session.reset()
+        assert session.data.time == 0
+    assert session.closed
+    assert 'mujoco.viewer' not in sys.modules
+    assert 'navprobe.cli' not in sys.modules
     for command in (('--gui',), ('preview',)):
         assert 'navprobe[gui]' in cli(*command, code=1)
     print(f'Installed NavProbe {navprobe.__version__}: CLI, presets, both robots, XML export, saved obstacles, and optional-dependency messages passed.')

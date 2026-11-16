@@ -92,6 +92,28 @@ they do not automatically archive tested scenarios or create a replay database.
 Manual scenario save/export is separate from the working directory used to run
 user-supplied full ZIP scripts. Those scripts may create their own output files.
 
+## Execution from Python
+
+The CLI and GUI use the same preparation and execution services as Python callers:
+
+```python
+from navprobe import validate_input, prepare_run, open_simulation
+
+info = validate_input("robot.zip")  # data inspection; does not import its controller
+# Inspect and trust the package before explicitly permitting its Python code.
+request = prepare_run(package="robot.zip", trust_package=True,
+                      approved_sha256=info.digest, maze=True,
+                      maze_rows=3, maze_columns=3)
+with open_simulation(request) as simulation:
+    simulation.step(1000)
+```
+
+A managed full-scene package omits generated scenario settings. Standalone Full
+ZIP scripts run through `run_experiment(request)` or `start_simulation(request)`
+instead of the managed stepping API. Python-native controllers can also be passed
+to `open_simulation(..., controller=controller, auto_follow=False)` without a ZIP.
+See the [Python API guide](api.md) for lifecycle ownership and error handling.
+
 ## Controller API
 
 `python/main.py` exports `create_controller()` returning an object with these methods:

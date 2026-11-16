@@ -195,7 +195,7 @@ Path('data/result.txt').write_text(helper.VALUE)
             payload = json.dumps(ScenarioPreset('Track', '', Scenario((Corridor(1),))).to_dict())
             with patch('sys.argv', ['worker', '--package', str(self.zip), '--approved-sha256', digest]), \
                  patch('sys.stdin', io.StringIO(payload)), \
-                 patch('navprobe.simulation.__main__.run') as viewer:
+                 patch('navprobe.simulation.run') as viewer:
                 self.assertEqual(main(), 0)
                 self.assertIn('controller', viewer.call_args.kwargs)
                 self.assertEqual(viewer.call_args.args[1] is None, mode == 'full')

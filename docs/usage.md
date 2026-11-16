@@ -4,6 +4,24 @@
 
 Commands and source paths assume the repository root unless stated otherwise.
 
+## Python access
+
+Every existing scenario and run setting is available through `ScenarioOptions`
+and `RunOptions`; the CLI and GUI use the same services. Python callers can use
+`create_scenario`, `generate_environment`, `prepare_run`, and `open_simulation`
+without opening an interface. See the [Python API guide](api.md) for returns,
+errors, and lifecycle examples. Library-first does not require using Python:
+the terminal and graphical workflows below remain available.
+
+## Robot footprint
+
+Generated runs now infer a circular footprint from the selected robot's initial
+collision geometry plus a 0.05 m margin. Generation-only commands can opt in with
+`--robot simple_robot` or a robot XML. Use `--robot-radius` for a manual final
+radius, `--footprint-margin` to adjust automatic clearance, and `--robot-body`
+for multi-robot models. The GUI offers the same automatic/manual choice and
+shows the effective radius. See [scenario documentation](scenarios.md) for limits.
+
 ## Command-line interface
 
 Run `navprobe` or `python -m navprobe` to enter the interactive terminal interface.

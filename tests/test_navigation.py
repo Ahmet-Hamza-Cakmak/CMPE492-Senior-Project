@@ -78,10 +78,12 @@ class PlannerTests(unittest.TestCase):
         with patch('sys.argv',['worker','--robot',str(example_robot()),'--auto-follow','--navigation','astar',
                                '--grid-resolution','.2','--navigation-clearance','.35','--simulation-speed','5']), \
              patch('sys.stdin',io.StringIO(json.dumps(ScenarioPreset('Test','',scenario).to_dict()))), \
-             patch('navprobe.simulation.__main__.build_model') as build, \
-             patch('navprobe.simulation.__main__.run') as runner:
+             patch('navprobe.simulation.build_model') as build, \
+             patch('navprobe.simulation.run') as runner:
             self.assertEqual(main(),0)
-            self.assertEqual(runner.call_args.kwargs['navigation'],'astar')
+            self.assertEqual(runner.call_args.kwargs['controller'].mode,'astar')
+            self.assertEqual(runner.call_args.kwargs['controller'].resolution,.2)
+            self.assertEqual(runner.call_args.kwargs['controller'].clearance,.35)
             self.assertEqual(runner.call_args.kwargs['simulation_speed'],5)
         model=mujoco.MjModel.from_xml_string('<mujoco/>')
         scene=mujoco.MjvScene(model,maxgeom=10)

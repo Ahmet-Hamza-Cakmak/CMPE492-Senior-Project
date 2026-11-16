@@ -253,18 +253,45 @@ Inside `navprobe>`, omit `python -m navprobe`.
 | `--object-height` | Fixed height of all boxes, metres | 0.4 |
 | `--object-clearance` | Minimum wall and inter-box gap, metres | 0.1 |
 | `--object-placement` | `navigation` (route/passage obstacles) or `clear-route` | navigation |
-| `--robot-radius` | Radius used for navigation-mode connectivity checks, metres | 0.3 |
+| `--robot` | Robot registry key or XML for footprint inference; export still contains only the environment | No robot for generation; simple_robot for run |
+| `--robot-radius` | Manual final circular radius, metres > 0; overrides inference | Inferred when a robot is selected; otherwise saved value or 0.3 |
+| `--footprint-margin` | Margin added to inferred radius, metres >= 0; not added to manual radius | 0.05 |
+| `--robot-body` | Root body for ambiguous multi-robot XML | Automatic single robot tree |
 
 The default `--object-placement navigation` uses each layout’s walkable floor. It targets the first box onto the original reference route, forcing a
 controller that follows that route to account for an obstacle. The remaining boxes
 are sampled across available floor space. Walls and mission-anchor regions remain
 protected. Open layouts use start/goal; loops use four quarter-lap anchors.
 Scenic rejects samples that disconnect these anchors after shrinking
-the floor and expanding obstacle footprints by `--robot-radius` (default 0.3 m).
+the floor and expanding obstacle footprints by the resolved robot radius.
 This checks geometric reachability for a circular robot, not a vehicle's turning
-constraints or controller performance. Set the radius to cover your robot footprint.
+constraints or controller performance. Automatic estimation encloses the selected robot's initial-pose collision bounds in a conservative circle about its root body; purely visual geometry and world geometry are excluded. It includes arms in their XML pose but does not assess later articulation, controller initialization, or dynamics. Use a manual radius when these assumptions are unsuitable.
 The dungeon reference route follows BSP connections; the maze reference route
 follows its cell graph. These are not computed physical shortest paths.
+
+For robot-aware generation without launching a viewer:
+
+```bash
+navprobe generate --maze --static-objects 3 --robot simple_robot --output maze.xml
+navprobe generate --dungeon --robot google_robot --footprint-margin 0.08 --output dungeon.xml
+navprobe run --scenario saved-maze.json --robot simple_robot
+navprobe generate --maze --robot-radius 0.4 --output manual.xml
+```
+
+Selected robots are inspected before Scenic sampling. CLI `run` automatically uses
+the selected/default robot; robot-only ZIPs use their contained model without executing
+controller code. The resolved radius is printed to stderr and stored in exported
+scenario JSON. Generation without a robot uses the stored/default radius. Initial
+floor and final obstacle connectivity are checked, including when there are no
+static boxes and when `clear-route` is used. A rejected scene is not automatically
+widened or relabelled as solvable. Existing concrete boxes are revalidated when
+only the footprint changes, never silently resampled; change population settings
+to request a new sample.
+
+In the GUI, **Infer from selected robot collision geometry** is on by default.
+The static-object panel shows the effective radius and inference margin. Uncheck
+it to edit **Manual footprint radius**. A root body can be selected for XMLs with
+multiple robot trees. Enlarge passages when a larger robot does not fit.
 
 Use `--object-placement clear-route` to protect a robot-radius band around the
 marked route. Dungeons additionally reserve their connecting passages. This mode is useful with

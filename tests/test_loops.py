@@ -1,5 +1,6 @@
 import json
 import math
+from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -45,9 +46,10 @@ class LoopTests(unittest.TestCase):
         payload = json.dumps(ScenarioPreset("Eight", "", scenario).to_dict())
         with patch("sys.argv", ["viewer", "--robot", "example.xml", "--auto-follow"]), \
              patch("sys.stdin", io.StringIO(payload)), \
-             patch("navprobe.simulation.__main__.build_model") as build, \
-             patch("navprobe.simulation.__main__.run") as run:
+             patch("navprobe.simulation.build_model") as build, \
+             patch("navprobe.simulation.run") as run:
             self.assertEqual(main(), 0)
-            build.assert_called_once_with("example.xml", scenario)
-            run.assert_called_once_with(build.return_value, scenario, auto_follow=True, robot_path="example.xml",
-                                        navigation="auto", grid_resolution=.25, navigation_clearance=None, simulation_speed=1.)
+            build.assert_called_once_with(Path("example.xml"), scenario)
+            self.assertEqual(run.call_args.args, (build.return_value, scenario))
+            self.assertEqual(run.call_args.kwargs['controller'].robot_path, Path("example.xml"))
+            self.assertEqual(run.call_args.kwargs['simulation_speed'], 1.)

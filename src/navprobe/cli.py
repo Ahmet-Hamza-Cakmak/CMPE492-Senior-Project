@@ -2,13 +2,10 @@
 
 import argparse
 import cmd
-from dataclasses import replace
 import json
 from pathlib import Path
 import shlex
-import subprocess
 import sys
-import uuid
 
 from .scenarios import CIRCUITS, Corridor, LoopScenario, Scenario, DungeonScenario, MazeScenario
 from .scenarios.library import (BUNDLED_DIRECTORY, ScenarioPreset, discover_presets,
@@ -32,7 +29,8 @@ Start here:
 Optional installs: navprobe[gui] for editor/preview; navprobe[scenic] for sampling.
 Dynamic obstacles, runtime monitoring, and automated campaigns are not available yet.
 
-Python API: from navprobe import MazeScenario, export_scene
+Python API: from navprobe import ScenarioOptions, create_scenario, RunOptions, open_simulation
+Every scenario/run setting is available through these library services; see docs/api.md.
 
 Interactive controls: status, stop, restart, exit.
 Use help COMMAND inside the prompt, or COMMAND --help in either context.""")
@@ -75,7 +73,12 @@ Use help COMMAND inside the prompt, or COMMAND --help in either context.""")
 """ + examples[action] + """
 
 Dungeon example: generate --dungeon --rooms 6 --room-shape circular --layout-seed 7 --output scene.xml
-Population example: generate --dungeon --static-objects 4 --object-seed 9 --output boxes.xml
+Population example: generate --dungeon --static-objects 4 --object-seed 9 --robot simple_robot --output boxes.xml
+A selected robot uses its initial-pose collision bounds plus --footprint-margin
+(default 0.05 m). --robot-radius overrides inference. Without a selected robot,
+generation preserves the saved radius or uses 0.3 m. Saved placements are checked
+against the selected robot, not silently resampled; enlarge passages if rejected.
+This checks planar circular-footprint connectivity, not dynamics or turning.
 New box samples require navprobe[scenic]; saved concrete placements can be reloaded
 without Scenic. Navigation placement targets the reference route while preserving
 geometric connectivity for --robot-radius; it does not guarantee controller success.
@@ -158,10 +161,14 @@ options. --trust-package permits imported Python execution; it is not a sandbox.
             ("object-min-size", float, "minimum box width/length in metres, > 0 and <= maximum (default: 0.25)"),
             ("object-max-size", float, "maximum box width/length in metres, <= 3 (default: 0.6)"),
             ("object-height", float, "fixed box height in metres, > 0 and <= 3 (default: 0.4)"),
-            ("robot-radius", float, "circular footprint radius for placement connectivity, > 0 and <= 2 metres (default: 0.3); separate from A* --navigation-clearance"),
+            ("robot-radius", float, "manual final footprint radius in metres, > 0; overrides automatic inference; without a robot use saved radius or 0.3; separate from A* clearance"),
             ("object-clearance", float, "minimum wall/object clearance in metres, 0–2 (default: 0.1)"),
         ):
             item.add_argument("--" + option, type=kind, help=description)
+        item.add_argument("--footprint-margin", type=float, default=None, help="extra clearance added to inferred collision radius, metres >= 0 (default: 0.05); not added to manual --robot-radius")
+        item.add_argument("--robot-body", help="root body name for footprint inference; required when the XML contains multiple robot trees")
+        if action != "run":
+            item.add_argument("--robot", help="robot key or XML used only to infer footprint for generation/preview/save; does not add a robot to exported XML")
         item.add_argument("--object-placement", choices=("navigation", "clear-route"),
                           help="navigation allows route/passage obstacles and targets the first box on the reference route; clear-route keeps the baseline route clear (default: navigation)")
         source.add_argument("--loop", choices=tuple(CIRCUITS), help="closed wall layout: circle or figure_eight; default radius/scale 2 m")
@@ -185,7 +192,7 @@ options. --trust-package permits imported Python execution; it is not a sandbox.
         if action == "run":
             item.add_argument("--navigation", choices=("auto", "line", "astar"), help="auto selects A* for simple_robot flat dungeons/mazes or populated tracks; otherwise line following")
             item.add_argument("--grid-resolution", type=float, help="A* grid spacing in metres (default: 0.25); finer grids resolve narrower passages")
-            item.add_argument("--navigation-clearance", type=float, help="A* circular footprint plus tracking margin, >= 0.25 m (default: max(0.3, object robot radius))")
+            item.add_argument("--navigation-clearance", type=float, help="A* circular footprint plus tracking margin, >= 0.25 m (default: max(0.3, resolved footprint radius))")
             item.add_argument("--simulation-speed", type=float, default=1.0, help="playback multiplier, 0.1–20 (default: 1); changes pacing, not physical robot speed or timestep")
             model = item.add_mutually_exclusive_group()
             model.add_argument("--robot", default=None, help="registered robot key or custom XML path (default: simple_robot)")
@@ -202,217 +209,56 @@ options. --trust-package permits imported Python execution; it is not a sandbox.
 
 
 def catalog(directory):
-    entries = []
-    for folder, origin in ((BUNDLED_DIRECTORY, "built-in"), (directory, "saved")):
-        presets, errors = discover_presets(Path(folder).expanduser())
-        entries.extend((path, preset, origin) for path, preset in presets)
-        for error in errors:
-            print(f"Warning: {folder}: {error}", file=sys.stderr)
-    return entries
+    from .services import list_presets
+    result = list_presets(directory)
+    for error in result.errors:
+        print(f"Warning: {error}", file=sys.stderr)
+    return [(entry.path, entry.preset, entry.origin) for entry in result.entries]
 
 
-def selected_preset(args):
-    if getattr(args, "scenic_seed", None) is not None and not getattr(args, "scenic", None):
-        raise ValueError("--scenic-seed requires --scenic.")
-    if getattr(args, "scenic", None):
-        from .scenarios.scenic_adapter import sample_scenic
-        preset = sample_scenic(args.scenic, seed=42 if args.scenic_seed is None else args.scenic_seed)
-    elif args.scenario:
-        preset = load_preset(args.scenario.expanduser())
-    elif args.preset:
-        matches = [preset for path, preset, _ in catalog(args.library)
-                   if args.preset in (path.stem, preset.name)]
-        if len(matches) != 1:
-            raise ValueError("Preset must match exactly one name or file stem; use 'list presets'.")
-        preset = matches[0]
-    else:
-        scenario = (LoopScenario(args.loop) if args.loop else
-                    Scenario(tuple(Corridor(*part) for part in args.corridor)) if args.corridor else
-                    Scenario((Corridor(2),)))
-        preset = ScenarioPreset("Custom track", "", scenario)
-    scenario = preset.scenario
-    maze_options = {key: getattr(args, option) for key, option in (
-        ("rows", "maze_rows"), ("columns", "maze_columns"), ("cell_size", "cell_size"),
-        ("algorithm", "maze_algorithm"), ("newest_probability", "newest_probability"),
-        ("loop_fraction", "loop_fraction")) if getattr(args, option, None) is not None}
-    if args.maze:
-        scenario = MazeScenario()
-        preset = ScenarioPreset("Custom maze", "", scenario)
-    if maze_options and not isinstance(scenario, MazeScenario):
-        raise ValueError("Maze settings require --maze or a maze preset/JSON.")
-    dungeon_options = {key: getattr(args, option) for key, option in (
-        ("map_width", "map_width"), ("map_height", "map_height"), ("room_count", "rooms"),
-        ("room_min", "room_min"), ("room_max", "room_max"), ("room_shape", "room_shape"),
-        ) if getattr(args, option, None) is not None}
-    if args.dungeon:
-        scenario = DungeonScenario()
-    elif dungeon_options and not isinstance(scenario, DungeonScenario):
-        raise ValueError("Dungeon settings require --dungeon or a dungeon preset/JSON.")
-    updates = {key: getattr(args, key) for key in ("width", "line_width", "radius") if getattr(args, key) is not None}
-    updates.update(dungeon_options)
-    updates.update(maze_options)
-    if args.layout_seed is not None:
-        if not isinstance(scenario, (DungeonScenario, MazeScenario)):
-            raise ValueError("--layout-seed requires a dungeon or maze scenario.")
-        updates["layout_seed"] = args.layout_seed
-    if "radius" in updates and not scenario.closed:
-        raise ValueError("--radius requires a loop scenario.")
-    terrain = {key: getattr(args, option) for key, option in
-               (("mode", "terrain"), ("height", "height"), ("spacing", "spacing"),
-                ("resolution", "resolution"), ("seed", "seed")) if getattr(args, option) is not None}
-    updates["terrain"] = replace(scenario.terrain, **terrain)
-    object_options = {key: getattr(args, option) for key, option in (
-        ("count", "static_objects"), ("seed", "object_seed"), ("min_size", "object_min_size"),
-        ("max_size", "object_max_size"), ("height", "object_height"), ("clearance", "object_clearance"),
-        ("placement", "object_placement"), ("robot_radius", "robot_radius"))
-        if getattr(args, option, None) is not None}
-    if object_options:
-        updates["objects"] = replace(scenario.objects, **object_options)
-    if any(value != getattr(scenario, key) for key, value in updates.items()):
-        updates["static_objects"] = None
-    scenario = replace(scenario, **updates)
-    from .scenarios.population import populate_scenario
-    scenario = populate_scenario(scenario)
-    return ScenarioPreset(getattr(args, "name", None) or preset.name,
-                          preset.description if getattr(args, "description", None) is None else args.description, scenario)
+def _report_footprint(preset, footprint, *, manual=False):
+    if footprint or manual:
+        source = f"inferred from {footprint.body}, includes {footprint.margin:g} m margin" if footprint else "manual override"
+        print(f"Robot footprint: {preset.scenario.objects.robot_radius:.3f} m radius ({source})", file=sys.stderr)
+
+
+def selected_preset(args, *, robot_path=None):
+    from .services import ScenarioOptions, configure_scenario
+    result = configure_scenario(ScenarioOptions.from_mapping(vars(args)), robot_path=robot_path)
+    for warning in result.warnings:
+        print(f"Warning: {warning}", file=sys.stderr)
+    _report_footprint(result.preset, result.footprint, manual=args.robot_radius is not None)
+    return result.preset
 
 
 def worker_request(args):
-    """Validate requests before starting or replacing a worker."""
-    from .assets import EXAMPLES, example_for_path
-    import math
-    if not math.isfinite(args.simulation_speed) or not .1 <= args.simulation_speed <= 20:
-        raise ValueError("--simulation-speed must be between 0.1 and 20.")
-    navigation_options = any(getattr(args,key) is not None for key in ("navigation", "grid_resolution", "navigation_clearance"))
-    if args.grid_resolution is not None and (not math.isfinite(args.grid_resolution) or args.grid_resolution <= 0):
-        raise ValueError("--grid-resolution must be finite and positive.")
-    if args.navigation_clearance is not None and (not math.isfinite(args.navigation_clearance) or args.navigation_clearance < .25):
-        raise ValueError("--navigation-clearance must be at least 0.25 m.")
-    if navigation_options and (args.scene or args.package):
-        raise ValueError("Navigation options apply to generated tracks with registered robots; imported scenes/packages provide their own controller.")
-    arguments = ["-m", "navprobe.simulation", "--simulation-speed", str(args.simulation_speed)]
-    payload = b""
-    track_options = ("maze_algorithm", "maze_rows", "maze_columns", "cell_size", "newest_probability", "loop_fraction", "object_placement", "robot_radius", "static_objects", "object_seed", "object_min_size", "object_max_size", "object_height", "object_clearance", "map_width", "map_height", "rooms", "room_min", "room_max", "room_shape", "layout_seed", "scenic", "scenic_seed", "preset", "scenario", "loop", "corridor", "width", "line_width", "radius",
-                     "terrain", "height", "spacing", "resolution", "seed")
-    if args.scene or args.package:
-        if args.auto_follow is not None:
-            raise ValueError("--auto-follow/--no-auto-follow applies only to generated tracks with a robot.")
-    if not args.package and (args.trust_package or args.menagerie or args.run_directory):
-        raise ValueError("Package options require --package.")
-    if args.scene:
-        if args.dungeon or args.maze or any(getattr(args, option) is not None for option in track_options):
-            raise ValueError("Track options cannot modify an imported scene.")
-        path = args.scene.expanduser().resolve()
-        if not path.is_file():
-            raise ValueError(f"Scene does not exist: {path}")
-        arguments.extend(["--scene", str(path)])
-    elif args.package:
-        from .experiments import open_package
-        path = args.package.expanduser().resolve()
-        with open_package(path, menagerie_directory=args.menagerie) as experiment:
-            if experiment.menagerie and not args.menagerie:
-                raise ValueError("This package requires --menagerie DIRECTORY.")
-            if experiment.mode != "robot" and (args.dungeon or args.maze or any(getattr(args, option) is not None for option in track_options)):
-                raise ValueError("Only robot packages accept generated track options.")
-            if not args.trust_package:
-                raise ValueError(f"Package '{experiment.name}' contains Python code that can access your files and network. "
-                                 f"SHA-256: {experiment.digest}. Inspect it, then use --trust-package if you trust it.")
-            arguments.extend(["--package", str(path), "--approved-sha256", experiment.digest])
-            if args.menagerie:
-                arguments.extend(["--menagerie", str(args.menagerie.expanduser().resolve())])
-            if args.run_directory and experiment.mode != "standalone":
-                raise ValueError("--run-directory is only supported for full ZIP packages with a standalone entry point.")
-            if experiment.mode == "standalone":
-                if args.simulation_speed != 1:
-                    raise ValueError("Full ZIP entry-point scripts own their simulation pacing.")
-                destination = args.run_directory or user_scenario_directory().parent / "runs" / uuid.uuid4().hex
-                destination = destination.expanduser().resolve()
-                arguments.extend(["--run-directory", str(destination)])
-                print(f"Full ZIP outputs: {destination / 'experiment'}")
-            if experiment.mode == "robot":
-                payload = json.dumps(selected_preset(args).to_dict(), allow_nan=False).encode()
-    else:
-        robot = next((example.path for example in EXAMPLES if example.key == (args.robot or "simple_robot")),
-                     Path(args.robot or "simple_robot").expanduser()).resolve()
-        if not robot.is_file():
-            raise ValueError(f"Robot does not exist: {robot}. Use 'list robots' for registered keys.")
-        automatic = args.auto_follow if args.auto_follow is not None else example_for_path(robot) is not None
-        if automatic and example_for_path(robot) is None:
-            raise ValueError("Automatic driving requires a registered robot; use --no-auto-follow for custom XML.")
-        arguments.extend(["--robot", str(robot)])
-        if automatic:
-            arguments.append("--auto-follow")
-        preset = selected_preset(args)
-        if navigation_options and not automatic:
-            raise ValueError("Navigation options require automatic driving; remove --no-auto-follow.")
-        if automatic:
-            from .assets import controller_mode
-            mode = controller_mode(robot, preset.scenario, args.navigation or "auto")
-            if mode != "astar" and (args.grid_resolution is not None or args.navigation_clearance is not None):
-                raise ValueError("Grid and navigation-clearance options require A* with the simple_robot on flat ground.")
-            arguments.extend(["--navigation", args.navigation or "auto"])
-            if args.grid_resolution is not None:
-                arguments.extend(["--grid-resolution", str(args.grid_resolution)])
-            if args.navigation_clearance is not None:
-                arguments.extend(["--navigation-clearance", str(args.navigation_clearance)])
-        payload = json.dumps(preset.to_dict(), allow_nan=False).encode()
-    executable = str(Path(sys.executable).with_name("mjpython")) if sys.platform == "darwin" else sys.executable
-    return [executable, *arguments], payload
+    from .execution import RunOptions, prepare_run
+    request = prepare_run(RunOptions.from_mapping(vars(args)))
+    for warning in request.warnings:
+        print(f"Warning: {warning}", file=sys.stderr)
+    if request.preset:
+        _report_footprint(request.preset, request.footprint, manual=args.robot_radius is not None)
+    if request.run_directory:
+        print(f"Full ZIP outputs: {request.run_directory / 'experiment'}")
+    return request.worker_request()
 
 
-def start_worker(request):
-    arguments, payload = request
-    process = subprocess.Popen(arguments, stdin=subprocess.PIPE)
-    try:
-        process.stdin.write(payload)
-        process.stdin.close()
-    except BrokenPipeError:
-        pass
-    return process
-
-
-def stop_worker(process):
-    if process is not None and process.poll() is None:
-        process.terminate()
-        try:
-            process.wait(timeout=3)
-        except subprocess.TimeoutExpired:
-            process.kill()
-            process.wait()
-
-
-def require_gui():
-    """Keep all non-GUI commands usable without the optional desktop dependency."""
-    import importlib.util
-    if importlib.util.find_spec("PySide6") is None:
-        raise ValueError('The GUI requires PySide6. Install it with: python -m pip install "navprobe[gui]" (or ".[gui]" from a checkout).')
-
-
-def preview(preset):
-    require_gui()
-    from PySide6.QtWidgets import QApplication
-    from .ui.preview import TrackPreview
-    app = QApplication.instance() or QApplication(["navprobe preview"])
-    window = TrackPreview()
-    window.setWindowTitle(preset.name)
-    window.resize(800, 600)
-    window.set_scenario(preset.scenario)
-    window.show()
-    return app.exec()
+# Compatibility for callers using these earlier interface helpers.
+from .execution import start_worker, stop_simulation as stop_worker
+from .interfaces import require_gui, preview_scenario as preview
 
 
 def execute(args, shell=None):
     if args.gui:
         if args.command:
             raise ValueError("Use --gui without a CLI command.")
-        require_gui()
-        from .ui.editor import main as gui_main
-        gui_main(["navprobe"])
+        from .interfaces import open_gui
+        open_gui()
         return 0
     if args.command == "list":
         if args.kind == "robots":
-            from .assets import EXAMPLES
-            for robot in EXAMPLES:
+            from .services import list_robots
+            for robot in list_robots():
                 print(f"{robot.key}\t{robot.label}\t{robot.path}")
         else:
             for path, preset, origin in catalog(args.library):
@@ -426,27 +272,22 @@ def execute(args, shell=None):
         if args.command == "preview":
             return preview(preset)
         if args.output:
-            with args.output.expanduser().open("x", encoding="utf-8") as file:
-                json.dump(preset.to_dict(), file, indent=2, allow_nan=False)
-                file.write("\n")
+            from .services import export_scenario
+            export_scenario(preset, args.output)
             print(f"Exported: {args.output}")
         if args.save:
             print(f"Saved: {save_preset(preset, args.library.expanduser())}")
         if not args.save and not args.output:
             print(json.dumps(preset.to_dict(), indent=2, allow_nan=False))
     elif args.command == "validate":
-        path = args.path.expanduser()
-        if path.suffix.lower() == ".zip":
-            from .experiments import open_package
-            with open_package(path, menagerie_directory=args.menagerie) as experiment:
-                print(f"Valid package: {experiment.name} ({experiment.mode}); SHA-256: {experiment.digest}")
-        elif path.suffix.lower() == ".xml":
-            from .simulation import load_scene
-            load_scene(path)
+        from .services import validate_input
+        result = validate_input(args.path, menagerie=args.menagerie)
+        if result.kind == "package":
+            print(f"Valid package: {result.name} ({result.mode}); SHA-256: {result.digest}")
+        elif result.kind == "scene":
             print("Valid MuJoCo scene")
         else:
-            preset = load_preset(path)
-            print(f"Valid scenario: {preset.name}")
+            print(f"Valid scenario: {result.name}")
     elif args.command == "run":
         request = worker_request(args)
         if shell:

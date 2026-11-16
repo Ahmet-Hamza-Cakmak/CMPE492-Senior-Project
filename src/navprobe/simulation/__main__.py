@@ -6,7 +6,8 @@ import sys
 import signal
 
 from ..scenarios.library import parse_preset
-from . import build_model, load_scene, run
+from ..execution import RunOptions, RunRequest, run_experiment
+from pathlib import Path
 
 
 def main():
@@ -29,44 +30,41 @@ def main():
 
     previous_handler = signal.signal(signal.SIGTERM, stop_worker)
     try:
+        options = RunOptions(robot=args.robot, scene=args.scene, package=args.package,
+            auto_follow=args.auto_follow if args.robot else None,
+            navigation=args.navigation if args.robot else None,
+            grid_resolution=args.grid_resolution if args.robot else None,
+            navigation_clearance=args.navigation_clearance if args.robot else None,
+            simulation_speed=args.simulation_speed, menagerie=args.menagerie,
+            trust_package=bool(args.approved_sha256), approved_sha256=args.approved_sha256,
+            run_directory=args.run_directory)
+        preset = None
+        mode = None
         if args.package:
             if not args.approved_sha256:
                 raise ValueError("Packaged Python requires explicit approval of the ZIP hash.")
             if args.auto_follow:
                 raise ValueError("Packaged experiments use their declared controller.")
             from ..experiments import open_package
-            from ..experiments.controllers import load_controller, place_robot
             with open_package(args.package, menagerie_directory=args.menagerie,
                               expected_digest=args.approved_sha256) as experiment:
+                mode = experiment.mode
                 if experiment.menagerie and not args.menagerie:
                     raise ValueError("This experiment needs a local mujoco_menagerie directory.")
-                if experiment.mode == "standalone":
-                    if args.simulation_speed != 1:
-                        raise ValueError("Full ZIP entry-point scripts own their simulation pacing.")
-                    from ..experiments import run_full_zip
-                    from ..scenarios.library import user_scenario_directory
-                    import uuid
-                    destination = args.run_directory or user_scenario_directory().parent / 'runs' / uuid.uuid4().hex
-                    run_full_zip(experiment, destination)
-                    return 0
-                scenario = parse_preset(json.load(sys.stdin)).scenario if experiment.mode == "robot" else None
-                model = build_model(experiment.model_path, scenario) if scenario else load_scene(experiment.model_path)
-                if scenario:
-                    place_robot(model, experiment.spawn)
-                controller, context = load_controller(experiment, scenario)
-                run(model, scenario, controller=controller, context=context, simulation_speed=args.simulation_speed)
-            return 0
-        if args.scene:
-            if args.auto_follow:
-                raise ValueError("Automatic line following is unavailable for imported scenes.")
-            run(load_scene(args.scene), simulation_speed=args.simulation_speed)
-            return 0
-        payload = json.load(sys.stdin)
-        scenario = parse_preset(payload).scenario
-        model = build_model(args.robot, scenario)
-        run(model, scenario, auto_follow=args.auto_follow, robot_path=args.robot,
-            navigation=args.navigation, grid_resolution=args.grid_resolution,
-            navigation_clearance=args.navigation_clearance, simulation_speed=args.simulation_speed)
+                if mode == "robot":
+                    preset = parse_preset(json.load(sys.stdin))
+        elif args.robot:
+            preset = parse_preset(json.load(sys.stdin))
+        elif args.auto_follow:
+            raise ValueError("Automatic line following is unavailable for imported scenes.")
+        request = RunRequest(options, preset=preset,
+            robot_path=Path(args.robot) if args.robot else None,
+            scene_path=Path(args.scene) if args.scene else None,
+            package_path=Path(args.package) if args.package else None,
+            package_mode=mode, approved_sha256=args.approved_sha256,
+            run_directory=Path(args.run_directory) if args.run_directory else None,
+            automatic=args.auto_follow)
+        run_experiment(request)
     except Exception as exc:
         print(f"Cannot run simulation: {exc}", file=sys.stderr)
         return 1

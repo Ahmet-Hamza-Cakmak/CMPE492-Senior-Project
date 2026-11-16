@@ -21,7 +21,7 @@ class ImportedSceneTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'Import MuJoCo scene XML'):
                 build_model(path, scenario)
             with patch('sys.argv', ['worker', '--scene', str(path)]), \
-                 patch('navprobe.simulation.__main__.run') as viewer:
+                 patch('navprobe.simulation.run') as viewer:
                 self.assertEqual(main(), 0)
                 self.assertGreater(viewer.call_args.args[0].ngeom, 0)
 
@@ -53,7 +53,7 @@ class ImportedSceneTests(unittest.TestCase):
             self.assertLess(data.qpos[2], 2)
             self.assertEqual(path.read_text(), xml)
             with patch('sys.argv', ['worker', '--scene', str(path)]), \
-                 patch('navprobe.simulation.__main__.run') as viewer:
+                 patch('navprobe.simulation.run') as viewer:
                 self.assertEqual(main(), 0)
                 self.assertEqual(viewer.call_args.args[0].ngeom, 2)
 

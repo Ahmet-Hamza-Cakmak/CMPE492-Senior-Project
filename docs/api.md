@@ -2,31 +2,197 @@
 
 [Documentation index](README.md) · [Project README](../README.md)
 
-Use `navprobe` for new Python integrations. Common operations are available at the
-package root; related functions also have public modules:
+NavProbe is library-first: existing configuration, generation, persistence,
+validation, and execution operations are available as Python calls. CLI and GUI
+adapt these shared services. You do not need an argument parser or a GUI to use them.
 
-| Import | Contents |
+The API is alpha. These services require NavProbe `0.1.0a2` or later; the older
+`0.1.0a1` release does not contain this complete service API.
+
+## Start with the shared services
+
+```python
+from navprobe import (
+    ScenarioOptions, RunOptions, create_scenario, export_scenario,
+    generate_environment, open_simulation, prepare_run,
+)
+
+preset = create_scenario(ScenarioOptions(
+    maze=True, maze_rows=4, maze_columns=4, maze_algorithm="prim",
+    layout_seed=7, robot="simple_robot",
+))
+export_scenario(preset, "case.json")  # explicit, optional persistence
+result = generate_environment(preset, "scene.xml")
+
+request = prepare_run(RunOptions(scenario=preset, robot="simple_robot"))
+with open_simulation(request) as session:  # no desktop/viewer required
+    session.step(1000)
+    print(session.data.time, session.data.qpos.copy())
+```
+
+Functions also accept keyword options: `create_scenario(maze=True, maze_rows=4)`
+and `open_simulation(scenario=preset, robot="simple_robot")` are equivalent forms.
+Use the prepared scenario/request again when comparing inputs; running does not
+save an automatic scenario archive.
+
+| Operation | Python service | Result |
+| --- | --- | --- |
+| List robots | `list_robots()` | Tuple of registered `RobotExample` values |
+| List presets | `list_presets(library=None)` | `PresetCatalog(entries, errors)`; errors are data, not terminal warnings |
+| Configure/load/edit/sample | `create_scenario(options=None, **changes)` | Prepared `ScenarioPreset` |
+| Configure with metadata | `configure_scenario(options=None, **changes)` | `ScenarioResult(preset, footprint, warnings)`; `.scenario` accesses the scenario |
+| Generate XML | `generate_environment(options=None, destination="scene.xml", **changes)` | `GeneratedEnvironment(path, result)` |
+| Export JSON | `export_scenario(preset, destination)` | New JSON `Path`; existing files are refused |
+| Save to preset library | `save_preset(preset, directory)` | New library JSON `Path` |
+| Load JSON | `load_preset(path)` | `ScenarioPreset` |
+| Validate JSON/XML/ZIP | `validate_input(path, menagerie=None)` | `ValidationResult(kind, name, path, mode, digest)` |
+| Prepare a run | `prepare_run(options=None, **changes)` | Frozen `RunRequest`; no controller execution/viewer |
+| Step physics in Python | `open_simulation(options=None, **changes)` | `SimulationSession`; use a context manager |
+| Run normally | `run_experiment(options=None, **changes)` | Blocking viewer or standalone ZIP entry point; no viewer until called |
+| Start a worker | `start_simulation(options=None, **changes)` | `subprocess.Popen`; inspect `poll()` / `wait()` for status |
+| Stop / restart a worker | `stop_simulation(process)`, `restart_simulation(process, options=None, **changes)` | Reaped process / replacement `Popen` |
+| Preview / GUI | `preview_scenario(preset)`, `open_gui()` | Explicit blocking desktop operations; return exit status |
+
+`ScenarioOptions`, `RunOptions`, and all services above are available from
+`navprobe`. They also live in `navprobe.services`, `navprobe.execution`, and
+`navprobe.interfaces`. Lower-level generation, navigation, scenario, controller,
+robot, and simulation modules remain available under their existing imports.
+
+## Settings and CLI correspondence
+
+Option names match CLI flags with hyphens replaced by underscores. Omitted
+(`None`) scenario overrides retain the source's value. Constructors reject
+unknown field names. The `from_mapping()` helpers are intended for interface
+adapters and deliberately ignore unrelated interface fields.
+
+| Group | `ScenarioOptions` fields |
 | --- | --- |
-| `navprobe` | Scenario types, static-object settings, presets, population, XML export, model loading/building, simulation, and A* planning |
-| `navprobe.scenarios` | Scenario types, `ScenarioPreset`, preset discovery/save/load, Scenic sampling, concrete population, and planar geometry |
-| `navprobe.generation` | `GenerationPipeline`, `GenerationContext`, callable stages, `generate_spec`, and `export_scene` |
-| `navprobe.simulation` | `example_robot`, `build_model`, `load_scene`, and `run` |
-| `navprobe.navigation` | `PlannedRoute`, `astar`, `plan_scenario`, and route drawing |
-| `navprobe.controllers` | `Controller`, `ControllerContext`, bundled adapter, and managed controller loading |
-| `navprobe.robots` | Bundled examples, robot registration, and controller selection |
-| `navprobe.experiments` | `Experiment`, `open_package`, and `run_full_zip` for full ZIP entry-point scripts |
+| One source | `scenario` (JSON path, scenario object, or preset), `preset` (name/stem), `scenic` (trusted Scenic path), `maze`, `dungeon`, `loop`, `corridor` (ordered `(length, turn)` pairs) |
+| Source metadata | `scenic_seed`, `library`, `name`, `description` |
+| Shared layout | `width`, `line_width`, `radius` (loop size) |
+| Maze | `maze_algorithm`, `maze_rows`, `maze_columns`, `cell_size`, `newest_probability`, `loop_fraction` |
+| Dungeon | `map_width`, `map_height`, `rooms`, `room_min`, `room_max`, `room_shape` |
+| Layout randomness | `layout_seed` |
+| Terrain | `terrain` (flat/waves/random), `height`, `spacing`, `resolution`, `seed` |
+| Population | `static_objects` (count), `object_seed`, `object_min_size`, `object_max_size`, `object_height`, `object_clearance`, `object_placement` |
+| Robot sizing | `robot`, `robot_radius`, `footprint_margin`, `robot_body` |
 
-The full implementation, CLI, GUI, and public API live under `src/navprobe/`.
-Convenience imports reference the same classes and functions as the detailed
-modules; there is a single implementation namespace.
-The API is alpha and can evolve between releases. This guide describes the source
-checkout; the new exports will be included in the next PyPI release.
+`RunOptions` includes those fields and adds `scene`, `package`, `auto_follow`,
+`navigation`, `grid_resolution`, `navigation_clearance`, `simulation_speed`,
+`menagerie`, `run_directory`, `trust_package`, and optional `approved_sha256`.
+Only one of `robot`, `scene`, or `package` may select an execution source. Without
+one, the simple robot is selected. `scene` and full packages reject generated
+layout overrides. Robot-only packages accept generated scenarios. `auto_follow`
+defaults on only for registered robots; explicit A* requires the simple robot on
+flat terrain. Grid/clearance overrides require A*. See [scenario parameters](scenarios.md)
+for units, limits, and defaults; the same validation applies to Python, CLI, and GUI.
 
-Importing these modules does not open the CLI, GUI, or simulation viewer, or import
-Qt or Scenic. The root namespace resolves exports on demand. Install the base
-package for generation and MuJoCo; add `[scenic]` for new constrained samples.
-`[gui]` is needed only for the editor/preview. A MuJoCo viewer requires a desktop
-with graphics support but does not require the GUI extra.
+`configure_scenario` and `generate_environment` accept either `ScenarioOptions`
+or an existing scenario/preset. `prepare_run`, execution, and worker-control
+services accept `RunOptions` or keyword settings; execution also accepts a
+prepared `RunRequest`. The latter freezes sampled scenario values for subsequent execution; robot XML
+and external assets are still read from their paths and are not archived.
+A prepared request cannot be combined with overrides; prepare a new request instead.
+
+## Execution, cleanup, and errors
+
+```python
+from navprobe import RunOptions, prepare_run, open_simulation, run_experiment
+
+request = prepare_run(RunOptions(scenario="case.json", robot="simple_robot"))
+with open_simulation(request) as session:
+    session.step(500)
+    position = session.data.qpos.copy()
+    session.reset()
+# session is closed; later step/reset calls raise RuntimeError
+
+# Explicitly open the normal viewer instead:
+# run_experiment(request)
+```
+
+A session exposes `model`, `data`, `controller`, `context`, `request`, and `closed`.
+`open_simulation(..., controller=my_controller, context=None, auto_follow=False)`
+also accepts a native Python controller without a ZIP. It must implement
+`reset(model, data, context)`, `step(model, data, context)`, and `close()`.
+A default `ControllerContext` supplies the scenario/route and model directory;
+a custom context may be supplied. Combining it with a package or automatic
+bundled controller is rejected. The session owns cleanup after successful setup.
+
+`step(steps=1)` advances a positive integer number of physics steps, with controller
+updates, and returns `data`; `reset()` restores the model's initial state and
+resets its controller. `close()` is idempotent. Context-manager exit closes the
+controller before releasing imported temporary files, even when the body raises.
+Headless stepping has no viewer pacing; `simulation_speed` affects viewer
+playback only. Runtime monitoring, dynamic agents, and automated campaigns remain
+planned; a session is an individual simulation, not a campaign/monitor service.
+
+Core services return Python values and do not print progress or parse terminal
+output. Invalid settings raise `ValueError` (or `TypeError` for incorrect API
+arguments), file errors raise `OSError`, and runtime/controller errors propagate.
+Closed sessions raise `RuntimeError`. MuJoCo may raise its own model/physics errors.
+These calls do not call `sys.exit`; a controller's requested `SystemExit` is
+translated to `RuntimeError`. Standalone entry points exiting with status zero
+are successful; nonzero exit status becomes `RuntimeError`. User Python and
+third-party tools may still produce output or have arbitrary process effects.
+
+Imported Python requires `trust_package=True`. `prepare_run` validates the ZIP
+and records its SHA-256 without importing controller code; execution rechecks
+that hash. `approved_sha256` additionally pins a previously inspected ZIP, as used
+by the GUI approval dialog. A robot-only ZIP's model is used for footprint
+inference; a full ZIP supplies its own environment. Standalone scripts run their
+own loop, so `open_simulation` rejects them; use `run_experiment` or
+`start_simulation` instead. An explicit `run_directory` is available only for
+standalone scripts. Use a fresh output directory for each standalone execution;
+existing directories are never overwritten. Their working files are separate from automatic scenario
+archiving, which remains outside scope.
+
+In-process imported controllers/scripts are trusted Python, not sandboxed or
+guaranteed thread-safe. Their imports and global state may affect the host.
+Use worker processes for independent executions. `restart_simulation` prepares
+the replacement before stopping the old worker. Always close sessions and stop
+workers when finished. No persistent files are created by a normal managed run.
+
+Importing `navprobe`, its root exports, or the service modules starts no CLI,
+Qt application, viewer, or simulation. Optional Qt and Scenic are loaded only
+when their operations are explicitly requested. Headless sessions need MuJoCo
+but do not import `mujoco.viewer`.
+
+## Robot-aware generation
+
+```python
+from navprobe import MazeScenario, example_robot, prepare_scenario, export_scene
+
+scenario, footprint = prepare_scenario(
+    MazeScenario(rows=4, columns=6),
+    robot_path=example_robot("simple_robot"),
+    margin=0.05,
+)
+print(footprint.raw_radius, footprint.radius)  # metres
+export_scene(scenario, "robot-aware-maze.xml")
+```
+
+`estimate_robot_footprint(robot_path, *, margin=0.05, body=None)` returns a frozen
+`RobotFootprint` with `body`, `raw_radius`, `margin`, `radius`, and `geometry_count`.
+It loads MJCF/includes/assets in place and uses MuJoCo collision-geometry bounding
+boxes transformed at `qpos0`. It does not step physics or execute a controller.
+It excludes world and purely visual geometry. The enclosing circle is centred on
+the selected body origin; multiple candidate trees require `body="name"`.
+This deliberately conservative estimate includes initial-pose articulated parts,
+not their future motion, and does not guarantee dynamic or turning feasibility.
+
+`prepare_scenario(scenario, *, robot_path=None, robot_radius=None, margin=0.05,
+body=None)` returns `(prepared_scenario, inferred_footprint_or_none)`. It resolves
+the radius before sampling and checks planar mission connectivity before and
+after population. A positive `robot_radius` overrides inference and is the final
+radius (no additional margin). Without a model or override, the stored/default
+radius is retained. Existing concrete placements are revalidated rather than
+silently resampled. Invalid/ambiguous geometry or disconnected mission anchors
+raise `ValueError`; enlarge the scene or supply an appropriate override.
+
+Use the returned scenario for export, model building, planning, and controller
+context so all operations use the same geometry and radius. Lower-level
+`export_scene`/`build_model` consume the supplied scenario; they do not resolve
+footprints independently. CLI and GUI use this shared preparation service.
 
 ## Generate an environment
 

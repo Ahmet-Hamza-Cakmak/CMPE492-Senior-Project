@@ -44,7 +44,8 @@ def build_model(robot_path, scenario: Scenario, *, pipeline=None):
 
 
 def run(model, scenario=None, *, auto_follow=False, robot_path=None, controller=None, context=None,
-        navigation="auto", grid_resolution=.25, navigation_clearance=None, simulation_speed=1.0):
+        navigation="auto", grid_resolution=.25, navigation_clearance=None, simulation_speed=1.0,
+        close_controller=True):
     import mujoco
     import mujoco.viewer
     import math
@@ -109,7 +110,7 @@ def run(model, scenario=None, *, auto_follow=False, robot_path=None, controller=
                 # Controller updates and physics retain their original timestep.
                 time.sleep(max(0, model.opt.timestep/simulation_speed - (time.monotonic() - started)))
     finally:
-        if managed:
+        if managed and close_controller:
             controller.close()
 
 

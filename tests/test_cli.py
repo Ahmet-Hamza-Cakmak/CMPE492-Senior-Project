@@ -74,7 +74,7 @@ class CliTests(unittest.TestCase):
         self.assertEqual(json.loads(payload)['type'], 'loop')
         with tempfile.TemporaryDirectory() as directory:
             robot = Path(directory) / 'robot.xml'
-            robot.write_text('<mujoco/>')
+            robot.write_text('<mujoco><worldbody><body><geom type="sphere" size=".1"/></body></worldbody></mujoco>')
             args = cli.parser().parse_args(['run', '--robot', str(robot)])
             self.assertNotIn('--auto-follow', cli.worker_request(args)[0])
             args.auto_follow = True
@@ -92,7 +92,8 @@ class CliTests(unittest.TestCase):
                 cli.worker_request(args)
 
     def test_package_requires_trust_and_passes_digest(self):
-        package = Mock(mode='robot', menagerie=False, digest='abc123')
+        from navprobe.simulation import example_robot
+        package = Mock(mode='robot', menagerie=False, digest='abc123', model_path=example_robot())
         package.name = 'Demo'
         with patch('navprobe.experiments.open_package') as opened:
             opened.return_value.__enter__.return_value = package

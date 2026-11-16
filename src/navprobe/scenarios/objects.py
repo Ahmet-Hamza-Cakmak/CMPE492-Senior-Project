@@ -33,8 +33,6 @@ class StaticObjectSettings:
         if self.placement not in ('navigation', 'clear-route'):
             raise ValueError('Object placement must be navigation or clear-route.')
         positive(self.robot_radius, 'Robot clearance radius')
-        if self.robot_radius > 2:
-            raise ValueError('Robot clearance radius must not exceed 2 m.')
         positive(self.clearance, 'Object clearance', zero=True)
         if not self.min_size <= self.max_size <= 3 or self.height > 3 or self.clearance > 2:
             raise ValueError('Require object min size <= max size <= 3 m, height <= 3 m, and clearance <= 2 m.')

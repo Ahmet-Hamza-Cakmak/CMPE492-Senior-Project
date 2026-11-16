@@ -95,7 +95,8 @@ class DungeonTests(unittest.TestCase):
             load_scene(root/'scene.xml')
             _,payload=cli.worker_request(cli.parser().parse_args(['run',*options]))
             import json
-            self.assertEqual(parse_preset(json.loads(payload)).scenario,saved.scenario)
+            from navprobe import prepare_scenario
+            self.assertEqual(parse_preset(json.loads(payload)).scenario,prepare_scenario(saved.scenario,robot_path=example_robot())[0])
             self.assertEqual(cli.main(['scenario','--rooms','5']),1)
             self.assertEqual(cli.main(['scenario','--dungeon','--terrain','waves']),1)
             args=cli.parser().parse_args(['run','--scene',str(root/'scene.xml'),'--dungeon'])
@@ -120,7 +121,8 @@ class DungeonGuiTests(unittest.TestCase):
                 window.dungeon_fields['layout_seed'].setText('7')
                 window.dungeon_fields['room_count'].setText('5')
                 scenario=window.scenario()
-                self.assertEqual(scenario, DungeonScenario(room_shape='circular',layout_seed=7,room_count=5))
+                from navprobe import prepare_scenario
+                self.assertEqual(scenario, prepare_scenario(DungeonScenario(room_shape='circular',layout_seed=7,room_count=5),robot_path=example_robot())[0])
                 self.assertEqual(window.preview.scenario,scenario)
                 self.assertFalse(window.terrain_card.isEnabled())
                 window.preview.resize(600,400)

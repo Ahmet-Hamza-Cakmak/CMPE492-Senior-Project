@@ -181,7 +181,6 @@ def run_full_zip(experiment, run_directory):
         (destination / 'mujoco_menagerie').symlink_to(external.resolve(), target_is_directory=True)
     entry = root / 'python' / 'main.py'
     old_cwd, old_argv, old_path = Path.cwd(), sys.argv[:], sys.path[:]
-    print(f'Experiment files: {root}', flush=True)
     try:
         os.chdir(root)
         sys.argv = [str(entry)]

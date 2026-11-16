@@ -149,7 +149,8 @@ class SharedPopulationTests(unittest.TestCase):
                     w.dirty=False
                     with patch.dict('sys.modules',{'scenic':None}):
                         w._add_preset(ScenarioPreset('Imported','',s),'Imported')
-                        self.assertEqual(w.scenario(),s)
+                        from navprobe import prepare_scenario, example_robot
+                        self.assertEqual(w.scenario(),prepare_scenario(s,robot_path=example_robot())[0])
                         self.assertFalse(w.object_panel.isHidden())
                         w.preview.resize(500,400);self.assertFalse(w.preview.grab().isNull())
                     w.object_fields['seed'].setText('9');w._edited()

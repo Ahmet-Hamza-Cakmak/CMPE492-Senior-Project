@@ -30,9 +30,9 @@ python -m pip install --pre "navprobe[all]"     # both GUI and Scenic
 navprobe --gui
 ```
 
-The current release is `0.1.0a1`; APIs and behaviour may change during alpha
+This documentation targets `0.1.0a2`; APIs and behaviour may change during alpha
 development. To install that exact release, use
-`python -m pip install "navprobe[all]==0.1.0a1"`. To upgrade to the latest
+`python -m pip install "navprobe[all]==0.1.0a2"`. To upgrade to the latest
 available prerelease, use `python -m pip install --upgrade --pre "navprobe[all]"`.
 
 On Windows activate with `.venv\Scripts\activate`.
@@ -48,7 +48,7 @@ python -m pip install "navprobe[all] @ git+https://github.com/Ahmet-Hamza-Cakmak
 ```
 
 To install a downloaded wheel, use
-`python -m pip install /path/to/navprobe-0.1.0a1-py3-none-any.whl`.
+`python -m pip install /path/to/navprobe-0.1.0a2-py3-none-any.whl`.
 
 ## Commands and platform notes
 

@@ -23,22 +23,31 @@ class Controller(Protocol):
 
 
 def load_controller(experiment, scenario=None):
-    """Call only inside the worker after approval of this exact ZIP's digest."""
+    """Load trusted controller Python after approval of this exact ZIP digest."""
     context = ControllerContext(experiment.root, experiment.config, scenario,
                                 tuple(scenario.points()) if scenario is not None else None,
                                 experiment.route_path)
-    sys.path.insert(0, str(experiment.controller_path.parent))
-    spec = importlib.util.spec_from_file_location('experiment_controller', experiment.controller_path)
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    factory = getattr(module, 'create_controller', None)
-    if not callable(factory):
-        raise ValueError('Controller must export create_controller() returning an object with reset, step and close.')
-    controller = factory()
-    for name in ('reset', 'step', 'close'):
-        if not callable(getattr(controller, name, None)):
-            raise ValueError(f'Controller is missing {name}().')
+    import uuid
+    old_path = sys.path[:]
+    module_name = "navprobe_controller_" + uuid.uuid4().hex
+    try:
+        sys.path.insert(0, str(experiment.controller_path.parent))
+        spec = importlib.util.spec_from_file_location(module_name, experiment.controller_path)
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[module_name] = module
+        spec.loader.exec_module(module)
+        factory = getattr(module, 'create_controller', None)
+        if not callable(factory):
+            raise ValueError('Controller must export create_controller() returning an object with reset, step and close.')
+        controller = factory()
+        for name in ('reset', 'step', 'close'):
+            if not callable(getattr(controller, name, None)):
+                raise ValueError(f'Controller is missing {name}().')
+    except BaseException:
+        sys.modules.pop(module_name, None)
+        raise
+    finally:
+        sys.path[:] = old_path
     return controller, context
 
 

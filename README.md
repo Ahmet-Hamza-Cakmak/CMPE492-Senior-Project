@@ -3,8 +3,8 @@
 **Randomized navigation scenarios and simulation testing for mobile robots.**
 
 Generate environments, place static obstacles with Scenic, and test robot
-controllers in MuJoCo. Use the command line for repeatable experiments or the
-optional graphical editor to configure and preview scenarios.
+controllers in MuJoCo through a Python library. The command line and optional
+graphical editor use the same configuration and execution services.
 
 - Corridors, loops, BSP dungeons, and DFS/Prim/Growing Tree mazes.
 - Configurable terrain, dimensions, seeds, and static obstacles.
@@ -33,15 +33,29 @@ Choose the installation that fits your workflow:
 
 | Command | Includes |
 | --- | --- |
-| `pip install --pre navprobe` | CLI, geometry, and MuJoCo |
+| `pip install --pre navprobe` | Python library, CLI, geometry, and MuJoCo |
 | `pip install --pre "navprobe[gui]"` | Base package plus graphical editor and preview |
 | `pip install --pre "navprobe[scenic]"` | Base package plus constrained scenario sampling |
 | `pip install --pre "navprobe[all]"` | Both GUI and Scenic |
 
-**NavProbe is in alpha (`0.1.0a1`): APIs and behaviour may change.** The `--pre`
+**NavProbe is in alpha (`0.1.0a2`): APIs and behaviour may change.** The `--pre`
 flag enables installation of prereleases. See the
 [installation guide](docs/installation.md) for source installation, upgrades,
 platform notes, and compatibility.
+
+## Python library
+
+```python
+from navprobe import create_scenario, generate_environment, open_simulation
+
+preset = create_scenario(maze=True, maze_rows=4, maze_columns=4, robot="simple_robot")
+generate_environment(preset, "maze.xml")
+with open_simulation(scenario=preset, robot="simple_robot") as simulation:
+    simulation.step(1000)
+```
+
+These services require NavProbe `0.1.0a2` or later. See the [Python API guide](docs/api.md) for all
+settings, imported experiments, lifecycle management, and optional viewers.
 
 ## Quick start
 
@@ -67,16 +81,6 @@ Use `navprobe --help`, `navprobe generate --help`, or `navprobe run --help` for
 options. Running `navprobe` alone opens the interactive prompt.
 `python -m navprobe` is equivalent. Python imports and implementation modules
 use `navprobe`; `robo-sim-py` remains an alias for the terminal command.
-
-## Python library
-
-```python
-from navprobe import MazeScenario, export_scene
-
-export_scene(MazeScenario(rows=4, columns=4), "maze.xml")
-```
-
-See the [Python API guide](docs/api.md) for planning, persistence, and simulation.
 
 ## Documentation
 

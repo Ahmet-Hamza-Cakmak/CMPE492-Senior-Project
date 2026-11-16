@@ -48,6 +48,17 @@ class PublicApiTests(unittest.TestCase):
             output = export_scene(restored.scenario, Path(directory) / 'scene.xml')
             self.assertGreater(load_scene(output).ngeom, 0)
 
+    def test_headless_session_needs_no_viewer_or_interface_modules(self):
+        result = subprocess.run([sys.executable, '-c', """
+import sys
+from navprobe import open_simulation
+with open_simulation(corridor=((2, 0),)) as session:
+    session.step(2)
+for name in ('mujoco.viewer', 'PySide6', 'scenic', 'navprobe.cli', 'navprobe.ui.editor'):
+    assert name not in sys.modules, name
+"""], capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def test_imports_do_not_load_optional_integrations_or_start_interfaces(self):
         result = subprocess.run([sys.executable, '-c', '''
 import sys

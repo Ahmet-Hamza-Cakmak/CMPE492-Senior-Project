@@ -12,6 +12,10 @@ grouped by responsibility:
 
 | Area | What belongs here |
 | --- | --- |
+| [services.py](../src/navprobe/services.py) | Scenario options, configuration, catalogs, explicit JSON/XML export, and input validation. |
+| [execution.py](../src/navprobe/execution.py) | Run options/requests, launch validation, managed headless sessions, viewer execution, and worker control. |
+| [interfaces.py](../src/navprobe/interfaces.py) | Explicit optional GUI/preview entry points, loaded only when requested. |
+| [footprint.py](../src/navprobe/footprint.py) | Initial collision-footprint inference and shared connectivity preparation. |
 | [ui/](../src/navprobe/ui/) | [editor.py](../src/navprobe/ui/editor.py) contains the PySide6 window and process controls; [preview.py](../src/navprobe/ui/preview.py) draws the track preview. |
 | [scenarios/](../src/navprobe/scenarios/) | [__init__.py](../src/navprobe/scenarios/__init__.py) defines corridor and loop geometry; [library.py](../src/navprobe/scenarios/library.py) loads/saves scenarios; [presets/](../src/navprobe/scenarios/presets/) holds built-in track and maze configurations. |
 | [simulation/](../src/navprobe/simulation/) | [__init__.py](../src/navprobe/simulation/__init__.py) builds and runs MuJoCo models; [walls.py](../src/navprobe/simulation/walls.py) calculates wall geometry; [__main__.py](../src/navprobe/simulation/__main__.py) is the separate viewer process entry point. |
@@ -23,8 +27,9 @@ The package's [__main__.py](../src/navprobe/__main__.py) is intentionally small:
 
 To change the UI, start in the UI folder. To add a preset, add JSON in the preset folder. To add a robot, create its asset folder and register it in the asset registry. To change physics or walls, use the simulation folder.
 
-Use `navprobe` imports for integrations. CLI and GUI call these implementation
-modules directly. Short convenience modules such as `navprobe.generation` expose
+Use `navprobe` imports for integrations. CLI and GUI translate interface values into `ScenarioOptions` and `RunOptions`,
+then call shared application services. Domain validation and execution dispatch
+are owned by the library. Short convenience modules such as `navprobe.generation` expose
 related operations without duplicating their logic. Earlier Python integrations
 need the import changes described in the [migration guide](api.md#migrating-earlier-alpha-integrations);
 saved scenario formats are unchanged.
@@ -64,13 +69,11 @@ To add another supported example, create a package under the assets directory wi
 ## Python API and verification
 
 ```python
-from navprobe import Corridor, Scenario
-from navprobe.simulation import build_model, example_robot, run
+from navprobe import RunOptions, open_simulation
 
-scenario = Scenario((Corridor(2), Corridor(1.5, 90), Corridor(2, -45)))
-robot_path = example_robot("google_robot")  # or "simple_robot"
-model = build_model(robot_path, scenario)
-run(model, scenario, auto_follow=True, robot_path=robot_path)
+with open_simulation(RunOptions(maze=True, maze_rows=3, maze_columns=3)) as session:
+    session.step(1000)
+    print(session.data.time)
 ```
 
 Run headless tests after installation with `python -m unittest discover -s tests`. These check geometry, validation, model loading, actual driving through turns, endpoint braking, and controller reset; the Qt editor tests use offscreen rendering, while interactive MuJoCo requires a desktop display.

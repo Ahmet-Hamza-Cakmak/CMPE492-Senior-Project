@@ -42,9 +42,10 @@ class EditorTests(unittest.TestCase):
             self.window.scenic_button.click()
         sample.assert_called_once_with(seed=7)
         self.assertEqual(self.window.category_choice.currentData(), 'corridors')
-        self.assertEqual(self.window.scenario(), preset.scenario)
+        from navprobe import prepare_scenario, example_robot
+        self.assertEqual(self.window.scenario(), prepare_scenario(preset.scenario, robot_path=example_robot())[0])
         self.assertTrue(self.window.dirty)
-        self.assertEqual(self.window.preview.scenario, preset.scenario)
+        self.assertEqual(self.window.preview.scenario, self.window.scenario())
 
     def test_scenic_sampling_failure_preserves_current_scenario(self):
         original = self.window.scenario()
@@ -54,6 +55,30 @@ class EditorTests(unittest.TestCase):
             self.window.scenic_button.click()
         warning.assert_called_once()
         self.assertEqual(self.window.scenario(), original)
+
+    def test_automatic_footprint_and_manual_override_match_cli(self):
+        from navprobe import estimate_robot_footprint, example_robot
+        from navprobe import cli
+        from contextlib import redirect_stderr
+        import io
+        inferred = estimate_robot_footprint(example_robot())
+        self.assertTrue(self.window.automatic_footprint.isChecked())
+        self.assertFalse(self.window.object_fields["robot_radius"].isEnabled())
+        self.assertAlmostEqual(self.window.scenario().objects.robot_radius, inferred.radius)
+        self.assertIn("Effective radius", self.window.footprint_note.text())
+        self.window.automatic_footprint.setChecked(False)
+        self.window.object_fields["robot_radius"].setText("0.2")
+        self.assertEqual(self.window.scenario().objects.robot_radius, .2)
+        with redirect_stderr(io.StringIO()):
+            preset = cli.selected_preset(cli.parser().parse_args(['scenario', '--robot', 'simple_robot', '--robot-radius', '.2']))
+        self.assertEqual(self.window.scenario().objects.robot_radius, preset.scenario.objects.robot_radius)
+
+    def test_large_robot_disables_launch_for_narrow_track(self):
+        self.window.robot_choice.setCurrentIndex(1)
+        self.assertFalse(self.window.launch_button.isEnabled())
+        self.assertIn("Enlarge passages", self.window.status.text())
+        self.window.width.setText("1.2")
+        self.assertTrue(self.window.launch_button.isEnabled())
 
     def test_astar_and_playback_options_reach_worker(self):
         self.window.category_choice.setCurrentIndex(self.window.category_choice.findData('dungeons'))
@@ -193,13 +218,14 @@ class EditorTests(unittest.TestCase):
     def test_custom_model_disables_controller_and_launch_snapshot_is_current(self):
         self.window.robot_choice.setCurrentIndex(1)
         self.window.preset_choice.setCurrentIndex(3)
+        self.window.width.setText("1.2")
         self.assertTrue(self.window.auto_follow.isChecked())
         with patch.object(self.window.process, "start"):
             self.window.launch()
         self.assertIn("--auto-follow", self.window.process.arguments())
         self.assertEqual(json.loads(self.window.pending_scenario)["corridors"][2]["turn"], -90)
         custom = Path(self.directory.name) / "robot.xml"
-        custom.write_text("<mujoco/>")
+        custom.write_text('<mujoco><worldbody><body><geom type="sphere" size=".1"/></body></worldbody></mujoco>')
         self.window.robot_path.setText(str(custom))
         self.assertFalse(self.window.auto_follow.isEnabled())
         with patch.object(self.window.process, "start"):
@@ -212,12 +238,10 @@ class EditorTests(unittest.TestCase):
         self.window.robot_path.setText(str(custom))
         with patch.object(QMessageBox, "warning") as warning:
             self.window.launch()
-            self.assertTrue(self.window.process.waitForFinished(10000))
-            self.app.processEvents()
-            self.assertNotEqual(self.window.process.exitCode(), 0)
-            self.assertIn("Cannot run simulation", self.window.last_error_output)
+            self.assertEqual(self.window.process.state(), QProcess.ProcessState.NotRunning)
             warning.assert_called_once()
-        self.assertTrue(self.window.launch_button.isEnabled())
+            self.assertIn("Cannot inspect robot", str(warning.call_args))
+        self.assertFalse(self.window.launch_button.isEnabled())
         self.assertFalse(self.window.stop_button.isEnabled())
 
     def test_loop_category_edit_save_reload_and_switch_back(self):
@@ -255,7 +279,8 @@ class EditorTests(unittest.TestCase):
                 QTest.keyClick(self.window.preset_choice, Qt.Key.Key_Down)
             self.app.processEvents()
             expected = self.window.preset_choice.itemData(index)
-            self.assertEqual(self.window.preview.scenario, expected.scenario)
+            from navprobe import prepare_scenario, example_robot
+            self.assertEqual(self.window.preview.scenario, prepare_scenario(expected.scenario, robot_path=example_robot())[0])
             with patch.object(self.window.process, "start"):
                 self.window.launch()
             self.assertEqual(json.loads(self.window.pending_scenario)["corridors"],

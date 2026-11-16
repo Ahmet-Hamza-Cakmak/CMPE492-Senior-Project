@@ -5,13 +5,13 @@
 ## Using NavProbe
 
 1. [Install NavProbe](installation.md): choose the base package or optional extras.
-2. [Use the CLI and run simulations](usage.md): commands, imported scenes, and export workflows.
-3. [Configure scenarios](scenarios.md): corridors, loops, dungeons, mazes, terrain, obstacles, and navigation.
-4. [Import experiment packages](experiments.md): robot/controller packages and complete experiments.
+2. [Use the Python library](api.md): shared options/services, headless sessions, viewers, and worker control.
+3. [Use the CLI and run simulations](usage.md): commands, imported scenes, and export workflows.
+4. [Configure scenarios](scenarios.md): corridors, loops, dungeons, mazes, terrain, obstacles, and navigation.
+5. [Import experiment packages](experiments.md): robot/controller packages and complete experiments.
 
 ## Developing NavProbe
 
-- [Python API](api.md): public imports, environment generation, map inputs, planning, and execution.
 - [Architecture and extensions](development.md).
 - [Build and validate distributions](packaging.md).
 - [CI and releases](ci.md): automated checks, required merge checks, and release-only PyPI publishing.
